@@ -112,7 +112,7 @@ func Create(scalewayProvider *ScalewayProvider) error {
 users:
 - name: devpod
   shell: /bin/bash
-  groups: [ sudo ]
+  groups: [ sudo, docker ]
   ssh_authorized_keys:
   - %s
 `, string(publicKey))),
