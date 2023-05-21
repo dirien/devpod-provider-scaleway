@@ -21,7 +21,7 @@ func NewStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Status an instance",
 		RunE: func(_ *cobra.Command, args []string) error {
-			scalewayProvider, err := scaleway.NewProvider(log.Default)
+			scalewayProvider, err := scaleway.NewProvider(log.Default, false)
 			if err != nil {
 				return err
 			}

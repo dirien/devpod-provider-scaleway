@@ -19,7 +19,7 @@ func NewInitCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Init account",
 		RunE: func(_ *cobra.Command, args []string) error {
-			scalewayProvider, err := scaleway.NewProvider(log.Default)
+			scalewayProvider, err := scaleway.NewProvider(log.Default, true)
 			if err != nil {
 				return err
 			}
