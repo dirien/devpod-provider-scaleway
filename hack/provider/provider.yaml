@@ -1,0 +1,135 @@
+name: scaleway
+version: ##VERSION##
+description: |-
+  DevPod on Scaleway
+icon: https://avatars3.githubusercontent.com/scaleway
+optionGroups:
+  - options:
+      - SCW_DISK_SIZE
+      - SCW_IMAGE
+      - SCW_COMMERCIAL_TYPE
+      - SCW_DEFAULT_ZONE
+    name: "Scaleway options"
+  - options:
+      - AGENT_PATH
+      - AGENT_DATA_PATH
+      - INACTIVITY_TIMEOUT
+      - INJECT_DOCKER_CREDENTIALS
+      - INJECT_GIT_CREDENTIALS
+    name: "Agent options"
+options:
+  SCW_ACCESS_KEY:
+    description: The Scaleway Access Key to use.
+    required: true
+    password: true
+
+  SCW_SECRET_KEY:
+    description: The Scaleway Secret Key to use.
+    required: true
+    password: true
+
+  SCW_DEFAULT_ORGANIZATION_ID:
+    description: The Scaleway organization id to use.
+    required: true
+
+  SCW_DEFAULT_PROJECT_ID:
+    description: The Scaleway project id to use.
+    required: true
+
+  SCW_DEFAULT_ZONE:
+    description: The Scaleway zone to use. E.g. fra1
+    required: true
+    default: fr-par-1
+    suggestions:
+      - fr-par-1
+      - fr-par-2
+      - fr-par-3
+      - nl-ams-1
+      - nl-ams-2
+      - pl-waw-1
+
+  SCW_DISK_SIZE:
+    description: The disk size in GB.
+    default: 150
+
+  SCW_IMAGE:
+    description: The disk image to use.
+    default: docker
+  SCW_COMMERCIAL_TYPE:
+    description: The machine type to use.
+    default: PLAY2-MICRO
+    suggestions:
+      - PLAY2-PICO
+      - PLAY2-NANO
+      - PLAY2-MICRO
+      - DEV1-S
+      - DEV1-M
+      - DEV1-L
+      - GP1-XS
+      - GP1-S
+      - GP1-M
+      - GP1-L
+  INACTIVITY_TIMEOUT:
+    description: If defined, will automatically stop the VM after the inactivity period.
+    default: 10m
+  INJECT_GIT_CREDENTIALS:
+    description: "If DevPod should inject git credentials into the remote host."
+    default: "true"
+  INJECT_DOCKER_CREDENTIALS:
+    description: "If DevPod should inject docker credentials into the remote host."
+    default: "true"
+  AGENT_PATH:
+    description: The path where to inject the DevPod agent to.
+    default: /home/devpod/.devpod/devpod
+  AGENT_DATA_PATH:
+    description: The path where to store the agent data.
+    default: /home/devpod/.devpod/agent
+agent:
+  path: ${AGENT_PATH}
+  dataPath: ${AGENT_DATA_PATH}
+  inactivityTimeout: ${INACTIVITY_TIMEOUT}
+  injectGitCredentials: ${INJECT_GIT_CREDENTIALS}
+  injectDockerCredentials: ${INJECT_DOCKER_CREDENTIALS}
+  binaries:
+    SCW_PROVIDER:
+      - os: linux
+        arch: amd64
+        path: https://github.com/dirien/devpod-provider-scaleway/releases/download/##VERSION##/devpod-provider-scaleway-linux-amd64
+        checksum: ##CHECKSUM_LINUX_AMD64##
+      - os: linux
+        arch: arm64
+        path: https://github.com/dirien/devpod-provider-scaleway/releases/download/##VERSION##/devpod-provider-scaleway-linux-arm64
+        checksum: ##CHECKSUM_LINUX_ARM64##
+  exec:
+    shutdown: |-
+      ${SCW_PROVIDER} stop
+binaries:
+  SCW_PROVIDER:
+    - os: linux
+      arch: amd64
+      path: https://github.com/dirien/devpod-provider-scaleway/releases/download/##VERSION##/devpod-provider-scaleway-linux-amd64
+      checksum: ##CHECKSUM_LINUX_AMD64##
+    - os: linux
+      arch: arm64
+      path: https://github.com/dirien/devpod-provider-scaleway/releases/download/##VERSION##/devpod-provider-scaleway-linux-arm64
+      checksum: ##CHECKSUM_LINUX_ARM64##
+    - os: darwin
+      arch: amd64
+      path: https://github.com/dirien/devpod-provider-scaleway/releases/download/##VERSION##/devpod-provider-scaleway-darwin-amd64
+      checksum: ##CHECKSUM_DARWIN_AMD64##
+    - os: darwin
+      arch: arm64
+      path: https://github.com/dirien/devpod-provider-scaleway/releases/download/##VERSION##/devpod-provider-scaleway-darwin-arm64
+      checksum: ##CHECKSUM_DARWIN_ARM64##
+    - os: windows
+      arch: amd64
+      path: https://github.com/dirien/devpod-provider-scaleway/releases/download/##VERSION##/devpod-provider-scaleway-windows-amd64.exe
+      checksum: ##CHECKSUM_WINDOWS_AMD64##
+exec:
+  init: ${SCW_PROVIDER} init
+  command: ${SCW_PROVIDER} command
+  create: ${SCW_PROVIDER} create
+  delete: ${SCW_PROVIDER} delete
+  start: ${SCW_PROVIDER} start
+  stop: ${SCW_PROVIDER} stop
+  status: ${SCW_PROVIDER} status
