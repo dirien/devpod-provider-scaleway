@@ -50,7 +50,7 @@ options:
 
   SCW_DISK_SIZE:
     description: The disk size in GB.
-    default: 150
+    default: "150"
 
   SCW_IMAGE:
     description: The disk image to use.
