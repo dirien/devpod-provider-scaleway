@@ -69,6 +69,11 @@ func FromEnv(init bool) (*Options, error) {
 		return nil, err
 	}
 
+	// Return eraly if we're just doing init
+	if init {
+		return retOptions, nil
+	}
+
 	retOptions.MachineID, err = fromEnvOrError(MACHINE_ID)
 	if err != nil {
 		return nil, err

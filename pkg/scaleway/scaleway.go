@@ -26,7 +26,7 @@ type ScalewayProvider struct {
 	WorkingDirectory string
 }
 
-func NewProvider(logs log.Logger) (*ScalewayProvider, error) {
+func NewProvider(logs log.Logger, init bool) (*ScalewayProvider, error) {
 	scwAccessKey := os.Getenv("SCW_ACCESS_KEY")
 	if scwAccessKey == "" {
 		return nil, errors.Errorf("SCW_ACCESS_KEY is not set")
@@ -37,7 +37,7 @@ func NewProvider(logs log.Logger) (*ScalewayProvider, error) {
 		return nil, errors.Errorf("SCW_SECRET_KEY is not set")
 	}
 
-	config, err := options.FromEnv(false)
+	config, err := options.FromEnv(init)
 
 	if err != nil {
 		return nil, err
