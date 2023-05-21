@@ -115,6 +115,7 @@ users:
   groups: [ sudo, docker ]
   ssh_authorized_keys:
   - %s
+  sudo: [ "ALL=(ALL) NOPASSWD:ALL" ]
 `, string(publicKey))),
 	})
 	if err != nil {
