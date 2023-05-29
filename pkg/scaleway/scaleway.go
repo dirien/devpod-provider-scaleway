@@ -73,6 +73,10 @@ func GetDevpodInstance(scalewayProvider *ScalewayProvider) (*instance.GetServerR
 		return nil, err
 	}
 
+	if len(servers.Servers) == 0 {
+		return nil, fmt.Errorf("no devpod instance found")
+	}
+
 	return scalewayProvider.InstanceAPI.GetServer(&instance.GetServerRequest{
 		ServerID: servers.Servers[0].ID,
 	})
