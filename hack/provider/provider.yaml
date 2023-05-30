@@ -2,7 +2,7 @@ name: scaleway
 version: ##VERSION##
 description: |-
   DevPod on Scaleway
-icon: https://avatars3.githubusercontent.com/scaleway
+icon: https://raw.githubusercontent.com/dirien/devpod-provider-scaleway/d5924bbd7054889d45b13a1546d08ee5e3acb7ff/scaleway.svg
 optionGroups:
   - options:
       - SCW_DISK_SIZE
