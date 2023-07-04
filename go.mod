@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/loft-sh/devpod v0.1.10
 	github.com/pkg/errors v0.9.1
-	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.17
+	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.18
 	github.com/spf13/cobra v1.7.0
 	golang.org/x/crypto v0.10.0
 )
