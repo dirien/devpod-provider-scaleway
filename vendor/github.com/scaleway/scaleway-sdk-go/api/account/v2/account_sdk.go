@@ -55,10 +55,14 @@ func NewAPI(client *scw.Client) *API {
 type ListProjectsRequestOrderBy string
 
 const (
-	ListProjectsRequestOrderByCreatedAtAsc  = ListProjectsRequestOrderBy("created_at_asc")
+	// Creation date ascending
+	ListProjectsRequestOrderByCreatedAtAsc = ListProjectsRequestOrderBy("created_at_asc")
+	// Creation date descending
 	ListProjectsRequestOrderByCreatedAtDesc = ListProjectsRequestOrderBy("created_at_desc")
-	ListProjectsRequestOrderByNameAsc       = ListProjectsRequestOrderBy("name_asc")
-	ListProjectsRequestOrderByNameDesc      = ListProjectsRequestOrderBy("name_desc")
+	// Name ascending
+	ListProjectsRequestOrderByNameAsc = ListProjectsRequestOrderBy("name_asc")
+	// Name descending
+	ListProjectsRequestOrderByNameDesc = ListProjectsRequestOrderBy("name_desc")
 )
 
 func (enum ListProjectsRequestOrderBy) String() string {
@@ -119,7 +123,8 @@ type CreateProjectRequest struct {
 	Description *string `json:"description"`
 }
 
-// CreateProject: create a new Project for an Organization.
+// Deprecated: CreateProject: create a new Project for an Organization.
+// Deprecated in favor of Account API v3.
 // Generate a new Project for an Organization, specifying its configuration including name and description.
 func (s *API) CreateProject(req *CreateProjectRequest, opts ...scw.RequestOption) (*Project, error) {
 	var err error
@@ -169,7 +174,8 @@ type ListProjectsRequest struct {
 	ProjectIDs []string `json:"-"`
 }
 
-// ListProjects: list all Projects of an Organization.
+// Deprecated: ListProjects: list all Projects of an Organization.
+// Deprecated in favor of Account API v3.
 // List all Projects of an Organization. The response will include the total number of Projects as well as their associated Organizations, names and IDs. Other information include the creation and update date of the Project.
 func (s *API) ListProjects(req *ListProjectsRequest, opts ...scw.RequestOption) (*ListProjectsResponse, error) {
 	var err error
@@ -213,7 +219,8 @@ type GetProjectRequest struct {
 	ProjectID string `json:"-"`
 }
 
-// GetProject: get an existing Project.
+// Deprecated: GetProject: get an existing Project.
+// Deprecated in favor of Account API v3.
 // Retrieve information about an existing Project, specified by its Project ID. Its full details, including ID, name and description, are returned in the response object.
 func (s *API) GetProject(req *GetProjectRequest, opts ...scw.RequestOption) (*Project, error) {
 	var err error
@@ -247,7 +254,8 @@ type DeleteProjectRequest struct {
 	ProjectID string `json:"-"`
 }
 
-// DeleteProject: delete an existing Project.
+// Deprecated: DeleteProject: delete an existing Project.
+// Deprecated in favor of Account API v3.
 // Delete an existing Project, specified by its Project ID. The Project needs to be empty (meaning there are no resources left in it) to be deleted effectively. Note that deleting a Project is permanent, and cannot be undone.
 func (s *API) DeleteProject(req *DeleteProjectRequest, opts ...scw.RequestOption) error {
 	var err error
@@ -283,7 +291,8 @@ type UpdateProjectRequest struct {
 	Description *string `json:"description"`
 }
 
-// UpdateProject: update Project.
+// Deprecated: UpdateProject: update Project.
+// Deprecated in favor of Account API v3.
 // Update the parameters of an existing Project, specified by its Project ID. These parameters include the name and description.
 func (s *API) UpdateProject(req *UpdateProjectRequest, opts ...scw.RequestOption) (*Project, error) {
 	var err error
