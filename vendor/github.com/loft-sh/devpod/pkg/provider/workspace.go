@@ -1,8 +1,17 @@
 package provider
 
 import (
+	"strings"
+
 	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/loft-sh/devpod/pkg/git"
 	"github.com/loft-sh/devpod/pkg/types"
+)
+
+var (
+	WorkspaceSourceGit   = "git:"
+	WorkspaceSourceLocal = "local:"
+	WorkspaceSourceImage = "image:"
 )
 
 type Workspace struct {
@@ -29,6 +38,9 @@ type Workspace struct {
 
 	// Source is the source where this workspace will be created from
 	Source WorkspaceSource `json:"source,omitempty"`
+
+	// DevContainerImage is the container image to use, overriding whatever is in the devcontainer.json
+	DevContainerImage string `json:"devContainerImage,omitempty"`
 
 	// DevContainerPath is the relative path where the devcontainer.json is located.
 	DevContainerPath string `json:"devContainerPath,omitempty"`
@@ -58,6 +70,9 @@ type WorkspaceMachineConfig struct {
 	// ID is the machine ID to use for this workspace
 	ID string `json:"machineId,omitempty"`
 
+	// UID is the machine UID to use for this workspace
+	UID string `json:"machineUid,omitempty"`
+
 	// AutoDelete specifies if the machine should get destroyed when
 	// the workspace is destroyed
 	AutoDelete bool `json:"autoDelete,omitempty"`
@@ -78,6 +93,9 @@ type WorkspaceSource struct {
 	// GitBranch is the branch to use
 	GitBranch string `json:"gitBranch,omitempty"`
 
+	// GitCommit is the commit SHA to checkout
+	GitCommit string `json:"gitCommit,omitempty"`
+
 	// LocalFolder is the local folder to use
 	LocalFolder string `json:"localFolder,omitempty"`
 
@@ -95,6 +113,9 @@ type AgentWorkspaceInfo struct {
 	// Agent holds the agent info
 	Agent ProviderAgentConfig `json:"agent,omitempty"`
 
+	// CLIOptions holds the cli options
+	CLIOptions CLIOptions `json:"cliOptions,omitempty"`
+
 	// Options holds the filled provider options for this workspace
 	Options map[string]config.OptionValue `json:"options,omitempty"`
 
@@ -105,18 +126,66 @@ type AgentWorkspaceInfo struct {
 	Origin string `json:"-"`
 }
 
+type CLIOptions struct {
+	// up options
+	ID                   string   `json:"id,omitempty"`
+	Source               string   `json:"source,omitempty"`
+	IDE                  string   `json:"ide,omitempty"`
+	IDEOptions           []string `json:"ideOptions,omitempty"`
+	PrebuildRepositories []string `json:"prebuildRepositories,omitempty"`
+	DevContainerImage    string   `json:"devContainerImage,omitempty"`
+	DevContainerPath     string   `json:"devContainerPath,omitempty"`
+	WorkspaceEnv         []string `json:"workspaceEnv,omitempty"`
+	Recreate             bool     `json:"recreate,omitempty"`
+	Proxy                bool     `json:"proxy,omitempty"`
+	DisableDaemon        bool     `json:"disableDaemon,omitempty"`
+	DaemonInterval       string   `json:"daemonInterval,omitempty"`
+
+	// build options
+	Repository string   `json:"repository,omitempty"`
+	SkipPush   bool     `json:"skipPush,omitempty"`
+	Platform   []string `json:"platform,omitempty"`
+
+	// TESTING
+	ForceBuild            bool `json:"forceBuild,omitempty"`
+	ForceInternalBuildKit bool `json:"forceInternalBuildKit,omitempty"`
+}
+
 func (w WorkspaceSource) String() string {
 	if w.GitRepository != "" {
 		if w.GitBranch != "" {
-			return w.GitRepository + "@" + w.GitBranch
+			return WorkspaceSourceGit + w.GitRepository + "@" + w.GitBranch
+		} else if w.GitCommit != "" {
+			return WorkspaceSourceGit + w.GitRepository + git.CommitDelimiter + w.GitCommit
 		}
 
-		return w.GitRepository
+		return WorkspaceSourceGit + w.GitRepository
+	} else if w.LocalFolder != "" {
+		return WorkspaceSourceLocal + w.LocalFolder
+	} else if w.Image != "" {
+		return WorkspaceSourceImage + w.Image
 	}
 
-	if w.LocalFolder != "" {
-		return w.LocalFolder
+	return ""
+}
+
+func ParseWorkspaceSource(source string) *WorkspaceSource {
+	if strings.HasPrefix(source, WorkspaceSourceGit) {
+		gitRepo, gitBranch, gitCommit := git.NormalizeRepository(strings.TrimPrefix(source, WorkspaceSourceGit))
+		return &WorkspaceSource{
+			GitRepository: gitRepo,
+			GitBranch:     gitBranch,
+			GitCommit:     gitCommit,
+		}
+	} else if strings.HasPrefix(source, WorkspaceSourceLocal) {
+		return &WorkspaceSource{
+			LocalFolder: strings.TrimPrefix(source, WorkspaceSourceLocal),
+		}
+	} else if strings.HasPrefix(source, WorkspaceSourceImage) {
+		return &WorkspaceSource{
+			Image: strings.TrimPrefix(source, WorkspaceSourceImage),
+		}
 	}
 
-	return w.Image
+	return nil
 }

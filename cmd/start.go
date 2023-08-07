@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/dirien/devpod-provider-scaleway/pkg/scaleway"
-	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/provider"
+	"github.com/loft-sh/log"
 	"github.com/spf13/cobra"
 )
 

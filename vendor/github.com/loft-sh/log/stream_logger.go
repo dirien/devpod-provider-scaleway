@@ -12,16 +12,18 @@ import (
 
 	"github.com/acarl005/stripansi"
 	goansi "github.com/k0kubun/go-ansi"
-	"github.com/loft-sh/devpod/pkg/hash"
-	"github.com/loft-sh/devpod/pkg/scanner"
-	"github.com/loft-sh/devpod/pkg/survey"
-	"github.com/loft-sh/devpod/pkg/terminal"
+	"github.com/loft-sh/log/hash"
+	"github.com/loft-sh/log/scanner"
+	"github.com/loft-sh/log/survey"
+	"github.com/loft-sh/log/terminal"
 	"github.com/mgutz/ansi"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-// var startTime = time.Now()
+func GetInstance() Logger {
+	return Default
+}
 
 var Default = NewStdoutLogger(os.Stdin, stdout, stderr, logrus.InfoLevel)
 
@@ -59,6 +61,13 @@ const (
 )
 
 func NewStdoutLogger(stdin io.Reader, stdout, stderr io.Writer, level logrus.Level) *StreamLogger {
+	if stdout == nil {
+		stdout = goansi.NewAnsiStdout()
+	}
+	if stderr == nil {
+		stderr = goansi.NewAnsiStderr()
+	}
+
 	return &StreamLogger{
 		m:           &sync.Mutex{},
 		level:       level,

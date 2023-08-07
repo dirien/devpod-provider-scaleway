@@ -48,8 +48,12 @@ func NewSSHClient(user, addr string, keyBytes []byte) (*ssh.Client, error) {
 	return client, nil
 }
 
-func StdioClientFromKeyBytes(keyBytes []byte, reader io.Reader, writer io.WriteCloser, exitOnClose bool) (*ssh.Client, error) {
-	return StdioClientFromKeyBytesWithUser(keyBytes, reader, writer, "", exitOnClose)
+func StdioClient(reader io.Reader, writer io.WriteCloser, exitOnClose bool) (*ssh.Client, error) {
+	return StdioClientFromKeyBytesWithUser(nil, reader, writer, "", exitOnClose)
+}
+
+func StdioClientWithUser(reader io.Reader, writer io.WriteCloser, user string, exitOnClose bool) (*ssh.Client, error) {
+	return StdioClientFromKeyBytesWithUser(nil, reader, writer, user, exitOnClose)
 }
 
 func StdioClientFromKeyBytesWithUser(keyBytes []byte, reader io.Reader, writer io.WriteCloser, user string, exitOnClose bool) (*ssh.Client, error) {
@@ -75,12 +79,14 @@ func ConfigFromKeyBytes(keyBytes []byte) (*ssh.ClientConfig, error) {
 	}
 
 	// key file authentication?
-	signer, err := ssh.ParsePrivateKey(keyBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "parse private key")
-	}
+	if len(keyBytes) > 0 {
+		signer, err := ssh.ParsePrivateKey(keyBytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "parse private key")
+		}
 
-	clientConfig.Auth = append(clientConfig.Auth, ssh.PublicKeys(signer))
+		clientConfig.Auth = append(clientConfig.Auth, ssh.PublicKeys(signer))
+	}
 	return clientConfig, nil
 }
 

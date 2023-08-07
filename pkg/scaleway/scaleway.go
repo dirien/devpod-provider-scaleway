@@ -10,8 +10,8 @@ import (
 
 	"github.com/dirien/devpod-provider-scaleway/pkg/options"
 	"github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/ssh"
+	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 	"github.com/scaleway/scaleway-sdk-go/api/account/v2"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
@@ -100,7 +100,7 @@ func Create(scalewayProvider *ScalewayProvider) error {
 		Tags:           []string{scalewayProvider.Config.MachineID},
 		Volumes: map[string]*instance.VolumeServerTemplate{
 			"0": {
-				Size: scw.Size(sizeGB) * scw.GB,
+				Size: scw.SizePtr(scw.Size(sizeGB) * scw.GB),
 			},
 		},
 		DynamicIPRequired: scw.BoolPtr(true),

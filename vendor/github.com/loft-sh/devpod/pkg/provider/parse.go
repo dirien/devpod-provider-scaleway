@@ -1,19 +1,15 @@
 package provider
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
-	"os"
+	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/blang/semver"
 	"github.com/ghodss/yaml"
-	"github.com/loft-sh/devpod/pkg/telemetry"
 	"github.com/pkg/errors"
 )
 
@@ -34,20 +30,8 @@ func ParseProvider(reader io.Reader) (*ProviderConfig, error) {
 		return nil, err
 	}
 
-	jsonBytes, err := yaml.YAMLToJSON(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(jsonBytes))
-
-	// Disallow unknown fields in standalone version but allow them in the UI unti we have a versioning strategy
-	if os.Getenv(telemetry.UIEnvVar) != "true" {
-		decoder.DisallowUnknownFields()
-	}
-
 	parsedConfig := &ProviderConfig{}
-	err = decoder.Decode(parsedConfig)
+	err = yaml.Unmarshal(payload, parsedConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "parse provider config")
 	}
@@ -117,17 +101,73 @@ func validate(config *ProviderConfig) error {
 		}
 	}
 
-	// validate driver
-	if config.Agent.Driver != "" && config.Agent.Driver != DockerDriver && config.Agent.Driver != KubernetesDriver {
-		return fmt.Errorf("agent.driver can only be docker or kubernetes")
-	}
-
 	// validate provider binaries
 	err := validateBinaries("binaries", config.Binaries)
 	if err != nil {
 		return err
 	}
-	err = validateBinaries("agent.binaries", config.Agent.Binaries)
+	err = validateProviderType(config)
+	if err != nil {
+		return err
+	}
+
+	err = validateOptionGroups(config)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateProviderType(config *ProviderConfig) error {
+	if config.Exec.Proxy != nil {
+		if !reflect.DeepEqual(config.Agent, ProviderAgentConfig{}) {
+			return fmt.Errorf("agent config is not allowed for proxy providers")
+		}
+		if len(config.Exec.Command) > 0 {
+			return fmt.Errorf("exec.command is not allowed in proxy providers")
+		}
+		if len(config.Exec.Create) > 0 {
+			return fmt.Errorf("exec.create is not allowed in proxy providers")
+		}
+		if len(config.Exec.Start) > 0 {
+			return fmt.Errorf("exec.create is not allowed in proxy providers")
+		}
+		if len(config.Exec.Stop) > 0 {
+			return fmt.Errorf("exec.create is not allowed in proxy providers")
+		}
+		if len(config.Exec.Status) > 0 {
+			return fmt.Errorf("exec.create is not allowed in proxy providers")
+		}
+		if len(config.Exec.Delete) > 0 {
+			return fmt.Errorf("exec.create is not allowed in proxy providers")
+		}
+		if len(config.Exec.Proxy.Status) == 0 {
+			return fmt.Errorf("exec.proxy.status is required for proxy providers")
+		}
+		if len(config.Exec.Proxy.Stop) == 0 {
+			return fmt.Errorf("exec.proxy.stop is required for proxy providers")
+		}
+		if len(config.Exec.Proxy.Delete) == 0 {
+			return fmt.Errorf("exec.proxy.delete is required for proxy providers")
+		}
+		if len(config.Exec.Proxy.Ssh) == 0 {
+			return fmt.Errorf("exec.proxy.ssh is required for proxy providers")
+		}
+		if len(config.Exec.Proxy.Up) == 0 {
+			return fmt.Errorf("exec.proxy.up is required for proxy providers")
+		}
+
+		return nil
+	}
+
+	// validate driver
+	if config.Agent.Driver != "" && config.Agent.Driver != DockerDriver && config.Agent.Driver != KubernetesDriver {
+		return fmt.Errorf("agent.driver can only be docker or kubernetes")
+	}
+
+	// agent binaries
+	err := validateBinaries("agent.binaries", config.Agent.Binaries)
 	if err != nil {
 		return err
 	}
@@ -155,29 +195,13 @@ func validate(config *ProviderConfig) error {
 		return fmt.Errorf("exec.create is required")
 	}
 
-	err = validateOptionGroups(config)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func validateOptionGroups(config *ProviderConfig) error {
-	foundOptions := map[string]bool{}
 	for idx, group := range config.OptionGroups {
 		if group.Name == "" {
 			return fmt.Errorf("optionGroups[%d].name cannot be empty", idx)
-		}
-
-		for _, option := range group.Options {
-			if config.Options == nil || config.Options[option] == nil {
-				return fmt.Errorf("option '%s' in option group '%s' was not found under options", option, group.Name)
-			} else if foundOptions[option] {
-				return fmt.Errorf("option '%s' is used in multiple option groups", option)
-			}
-
-			foundOptions[option] = true
 		}
 	}
 	return nil
@@ -208,17 +232,7 @@ func validateBinaries(prefix string, binaries map[string][]*ProviderBinary) erro
 	return nil
 }
 
-func ParseOptions(provider *ProviderConfig, options []string) (map[string]string, error) {
-	providerOptions := provider.Options
-	if providerOptions == nil {
-		providerOptions = map[string]*ProviderOption{}
-	}
-
-	allowedOptions := []string{}
-	for optionName := range providerOptions {
-		allowedOptions = append(allowedOptions, optionName)
-	}
-
+func ParseOptions(options []string) (map[string]string, error) {
 	retMap := map[string]string{}
 	for _, option := range options {
 		splitted := strings.Split(option, "=")
@@ -228,57 +242,6 @@ func ParseOptions(provider *ProviderConfig, options []string) (map[string]string
 
 		key := strings.ToUpper(strings.TrimSpace(splitted[0]))
 		value := strings.Join(splitted[1:], "=")
-		providerOption := providerOptions[key]
-		if providerOption == nil {
-			return nil, fmt.Errorf("invalid option '%s', allowed options are: %v", key, allowedOptions)
-		}
-
-		if providerOption.ValidationPattern != "" {
-			matcher, err := regexp.Compile(providerOption.ValidationPattern)
-			if err != nil {
-				return nil, err
-			}
-
-			if !matcher.MatchString(value) {
-				if providerOption.ValidationMessage != "" {
-					return nil, fmt.Errorf(providerOption.ValidationMessage)
-				}
-
-				return nil, fmt.Errorf("invalid value '%s' for option '%s', has to match the following regEx: %s", value, key, providerOption.ValidationPattern)
-			}
-		}
-
-		if len(providerOption.Enum) > 0 {
-			found := false
-			for _, e := range providerOption.Enum {
-				if value == e {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return nil, fmt.Errorf("invalid value '%s' for option '%s', has to match one of the following values: %v", value, key, providerOption.Enum)
-			}
-		}
-
-		if providerOption.Type != "" {
-			if providerOption.Type == "number" {
-				_, err := strconv.ParseInt(value, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("invalid value '%s' for option '%s', must be a number", value, key)
-				}
-			} else if providerOption.Type == "boolean" {
-				_, err := strconv.ParseBool(value)
-				if err != nil {
-					return nil, fmt.Errorf("invalid value '%s' for option '%s', must be a boolean", value, key)
-				}
-			} else if providerOption.Type == "duration" {
-				_, err := time.ParseDuration(value)
-				if err != nil {
-					return nil, fmt.Errorf("invalid value '%s' for option '%s', must be a duration like 10s, 5m or 24h", value, key)
-				}
-			}
-		}
 
 		retMap[key] = value
 	}

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/scanner"
+	"github.com/loft-sh/log"
+	"github.com/loft-sh/log/scanner"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 )
@@ -21,17 +21,21 @@ var (
 	MarkerEndPrefix   = "# DevPod End "
 )
 
-func ConfigureSSHConfig(context, workspace, user string, log log.Logger) error {
-	return configureSSHConfigSameFile(context, workspace, user, "", log)
+func ConfigureSSHConfig(configPath, context, workspace, user string, log log.Logger) error {
+	return configureSSHConfigSameFile(configPath, context, workspace, user, "", log)
 }
 
-func configureSSHConfigSameFile(context, workspace, user, command string, log log.Logger) error {
+func configureSSHConfigSameFile(configPath, context, workspace, user, command string, log log.Logger) error {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	sshConfigPath, err := getSSHConfig()
-	if err != nil {
-		return err
+	sshConfigPath := configPath
+	if sshConfigPath == "" {
+		var err error
+		sshConfigPath, err = getSSHConfig()
+		if err != nil {
+			return err
+		}
 	}
 
 	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, command)
@@ -68,10 +72,8 @@ func addHost(path, host, user, context, workspace, command string) (string, erro
 	newLines = append(newLines, "Host "+host)
 	newLines = append(newLines, "  ForwardAgent yes")
 	newLines = append(newLines, "  LogLevel error")
-	newLines = append(newLines, "  IdentityFile \""+filepath.Join(GetDevPodKeysDir(), DevPodSSHPrivateKeyFile)+"\"")
 	newLines = append(newLines, "  StrictHostKeyChecking no")
 	newLines = append(newLines, "  UserKnownHostsFile /dev/null")
-	newLines = append(newLines, "  IdentitiesOnly yes")
 	if command != "" {
 		newLines = append(newLines, fmt.Sprintf("  ProxyCommand %s", command))
 	} else {

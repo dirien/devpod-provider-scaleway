@@ -11,25 +11,24 @@ import (
 )
 
 const (
-	DEVPOD                   = "DEVPOD"
-	DEVPOD_OS                = "DEVPOD_OS"
-	DEVPOD_ARCH              = "DEVPOD_ARCH"
-	WORKSPACE_ID             = "WORKSPACE_ID"
-	WORKSPACE_FOLDER         = "WORKSPACE_FOLDER"
-	WORKSPACE_CONTEXT        = "WORKSPACE_CONTEXT"
-	WORKSPACE_ORIGIN         = "WORKSPACE_ORIGIN"
-	WORKSPACE_GIT_REPOSITORY = "WORKSPACE_GIT_REPOSITORY"
-	WORKSPACE_GIT_BRANCH     = "WORKSPACE_GIT_BRANCH"
-	WORKSPACE_LOCAL_FOLDER   = "WORKSPACE_LOCAL_FOLDER"
-	WORKSPACE_IMAGE          = "WORKSPACE_IMAGE"
-	WORKSPACE_PROVIDER       = "WORKSPACE_PROVIDER"
-	MACHINE_ID               = "MACHINE_ID"
-	MACHINE_CONTEXT          = "MACHINE_CONTEXT"
-	MACHINE_FOLDER           = "MACHINE_FOLDER"
-	MACHINE_PROVIDER         = "MACHINE_PROVIDER"
-	PROVIDER_ID              = "PROVIDER_ID"
-	PROVIDER_CONTEXT         = "PROVIDER_CONTEXT"
-	PROVIDER_FOLDER          = "PROVIDER_FOLDER"
+	DEVPOD             = "DEVPOD"
+	DEVPOD_OS          = "DEVPOD_OS"
+	DEVPOD_ARCH        = "DEVPOD_ARCH"
+	WORKSPACE_ID       = "WORKSPACE_ID"
+	WORKSPACE_UID      = "WORKSPACE_UID"
+	WORKSPACE_PICTURE  = "WORKSPACE_PICTURE"
+	WORKSPACE_FOLDER   = "WORKSPACE_FOLDER"
+	WORKSPACE_CONTEXT  = "WORKSPACE_CONTEXT"
+	WORKSPACE_ORIGIN   = "WORKSPACE_ORIGIN"
+	WORKSPACE_SOURCE   = "WORKSPACE_SOURCE"
+	WORKSPACE_PROVIDER = "WORKSPACE_PROVIDER"
+	MACHINE_ID         = "MACHINE_ID"
+	MACHINE_CONTEXT    = "MACHINE_CONTEXT"
+	MACHINE_FOLDER     = "MACHINE_FOLDER"
+	MACHINE_PROVIDER   = "MACHINE_PROVIDER"
+	PROVIDER_ID        = "PROVIDER_ID"
+	PROVIDER_CONTEXT   = "PROVIDER_CONTEXT"
+	PROVIDER_FOLDER    = "PROVIDER_FOLDER"
 )
 
 // FromEnvironment retrives options from environment and fills a machine with it. This is primarily
@@ -91,6 +90,9 @@ func ToOptionsWorkspace(workspace *Workspace) map[string]string {
 		if workspace.ID != "" {
 			retVars[WORKSPACE_ID] = workspace.ID
 		}
+		if workspace.UID != "" {
+			retVars[WORKSPACE_UID] = workspace.UID
+		}
 		if workspace.Folder != "" {
 			retVars[WORKSPACE_FOLDER] = filepath.ToSlash(workspace.Folder)
 		}
@@ -99,26 +101,19 @@ func ToOptionsWorkspace(workspace *Workspace) map[string]string {
 			retVars[MACHINE_CONTEXT] = workspace.Context
 		}
 		if workspace.Origin != "" {
-			retVars[WORKSPACE_ORIGIN] = workspace.Origin
+			retVars[WORKSPACE_ORIGIN] = filepath.ToSlash(workspace.Origin)
 		}
-		if workspace.Source.LocalFolder != "" {
-			retVars[WORKSPACE_LOCAL_FOLDER] = workspace.Source.LocalFolder
+		if workspace.Picture != "" {
+			retVars[WORKSPACE_PICTURE] = workspace.Picture
 		}
-		if workspace.Source.GitRepository != "" {
-			retVars[WORKSPACE_GIT_REPOSITORY] = workspace.Source.GitRepository
-		}
-		if workspace.Source.GitBranch != "" {
-			retVars[WORKSPACE_GIT_BRANCH] = workspace.Source.GitBranch
-		}
-		if workspace.Source.Image != "" {
-			retVars[WORKSPACE_IMAGE] = workspace.Source.Image
-		}
+		retVars[WORKSPACE_SOURCE] = workspace.Source.String()
 		if workspace.Provider.Name != "" {
 			retVars[WORKSPACE_PROVIDER] = workspace.Provider.Name
 		}
 		if workspace.Machine.ID != "" {
 			retVars[MACHINE_ID] = workspace.Machine.ID
-			retVars[MACHINE_FOLDER], _ = GetMachineDir(workspace.Context, workspace.Machine.ID)
+			machineDir, _ := GetMachineDir(workspace.Context, workspace.Machine.ID)
+			retVars[MACHINE_FOLDER] = filepath.ToSlash(machineDir)
 		}
 		for k, v := range GetBaseEnvironment(workspace.Context, workspace.Provider.Name) {
 			retVars[k] = v
@@ -183,7 +178,8 @@ func GetBaseEnvironment(context, provider string) map[string]string {
 	retVars[DEVPOD_ARCH] = runtime.GOARCH
 	retVars[PROVIDER_ID] = provider
 	retVars[PROVIDER_CONTEXT] = context
-	retVars[PROVIDER_FOLDER], _ = GetProviderDir(context, provider)
+	providerFolder, _ := GetProviderDir(context, provider)
+	retVars[PROVIDER_FOLDER] = filepath.ToSlash(providerFolder)
 	return retVars
 }
 
@@ -204,7 +200,23 @@ func GetProviderOptions(workspace *Workspace, server *Machine, devConfig *config
 	return retValues
 }
 
+func CloneAgentWorkspaceInfo(agentWorkspaceInfo *AgentWorkspaceInfo) *AgentWorkspaceInfo {
+	if agentWorkspaceInfo == nil {
+		return nil
+	}
+	out, _ := json.Marshal(agentWorkspaceInfo)
+	ret := &AgentWorkspaceInfo{}
+	_ = json.Unmarshal(out, ret)
+	ret.Origin = agentWorkspaceInfo.Origin
+	ret.Workspace = CloneWorkspace(agentWorkspaceInfo.Workspace)
+	ret.Machine = CloneMachine(agentWorkspaceInfo.Machine)
+	return ret
+}
+
 func CloneWorkspace(workspace *Workspace) *Workspace {
+	if workspace == nil {
+		return nil
+	}
 	out, _ := json.Marshal(workspace)
 	ret := &Workspace{}
 	_ = json.Unmarshal(out, ret)
@@ -213,6 +225,9 @@ func CloneWorkspace(workspace *Workspace) *Workspace {
 }
 
 func CloneMachine(server *Machine) *Machine {
+	if server == nil {
+		return nil
+	}
 	out, _ := json.Marshal(server)
 	ret := &Machine{}
 	_ = json.Unmarshal(out, ret)

@@ -47,40 +47,6 @@ type ContextConfig struct {
 	OriginalProvider string `json:"-"`
 }
 
-const (
-	ContextOptionInjectDockerCredentials = "INJECT_DOCKER_CREDENTIALS"
-	ContextOptionInjectGitCredentials    = "INJECT_GIT_CREDENTIALS"
-	ContextOptionAutoPortForwarding      = "AUTO_PORT_FORWARDING"
-	ContextOptionTelemetry               = "TELEMETRY"
-)
-
-var ContextOptions = []ContextOption{
-	{
-		Name:        ContextOptionInjectDockerCredentials,
-		Description: "Specifies if DevPod should inject docker credentials into the workspace",
-		Default:     "true",
-		Enum:        []string{"true", "false"},
-	},
-	{
-		Name:        ContextOptionInjectGitCredentials,
-		Description: "Specifies if DevPod should inject git credentials into the workspace",
-		Default:     "true",
-		Enum:        []string{"true", "false"},
-	},
-	{
-		Name:        ContextOptionAutoPortForwarding,
-		Description: "Specifies if DevPod should automatically try to port forward container ports",
-		Default:     "true",
-		Enum:        []string{"true", "false"},
-	},
-	{
-		Name:        ContextOptionTelemetry,
-		Description: "Specifies if DevPod should send telemetry information",
-		Default:     "true",
-		Enum:        []string{"true", "false"},
-	},
-}
-
 type ContextOption struct {
 	// Name of the context option
 	Name string `json:"name,omitempty"`
@@ -100,22 +66,6 @@ type IDEConfig struct {
 	Options map[string]OptionValue `json:"options,omitempty"`
 }
 
-type IDE string
-
-const (
-	IDENone       IDE = "none"
-	IDEVSCode     IDE = "vscode"
-	IDEOpenVSCode IDE = "openvscode"
-	IDEIntellij   IDE = "intellij"
-	IDEGoland     IDE = "goland"
-	IDEPyCharm    IDE = "pycharm"
-	IDEPhpStorm   IDE = "phpstorm"
-	IDECLion      IDE = "clion"
-	IDERubyMine   IDE = "rubymine"
-	IDERider      IDE = "rider"
-	IDEWebStorm   IDE = "webstorm"
-)
-
 type ProviderConfig struct {
 	// Initialized holds if the provider was initialized correctly.
 	Initialized bool `json:"initialized,omitempty"`
@@ -126,9 +76,14 @@ type ProviderConfig struct {
 	// Options are the configured provider options
 	Options map[string]OptionValue `json:"options,omitempty"`
 
+	// DynamicOptions are the unresolved dynamic provider options
+	DynamicOptions OptionDefinitions `json:"dynamicOptions,omitempty"`
+
 	// CreationTimestamp is the timestamp when this provider was added
 	CreationTimestamp types.Time `json:"creationTimestamp,omitempty"`
 }
+
+type OptionDefinitions = map[string]*types.Option
 
 type OptionValue struct {
 	// Value is the value of the option
@@ -139,6 +94,9 @@ type OptionValue struct {
 
 	// Filled is the time when this value was filled
 	Filled *types.Time `json:"filled,omitempty"`
+
+	// Children are the child options
+	Children []string `json:"children,omitempty"`
 }
 
 func (c *Config) Current() *ContextConfig {
@@ -147,6 +105,10 @@ func (c *Config) Current() *ContextConfig {
 
 func (c *Config) ProviderOptions(provider string) map[string]OptionValue {
 	return c.Current().ProviderOptions(provider)
+}
+
+func (c *Config) DynamicProviderOptionDefinitions(provider string) OptionDefinitions {
+	return c.Current().DynamicProviderOptionDefinitions(provider)
 }
 
 func (c *Config) IDEOptions(ide string) map[string]OptionValue {
@@ -197,6 +159,18 @@ func (c *ContextConfig) ProviderOptions(provider string) map[string]OptionValue 
 	}
 
 	for k, v := range c.Providers[provider].Options {
+		retOptions[k] = v
+	}
+	return retOptions
+}
+
+func (c *ContextConfig) DynamicProviderOptionDefinitions(provider string) OptionDefinitions {
+	retOptions := OptionDefinitions{}
+	if c.Providers == nil || c.Providers[provider] == nil {
+		return retOptions
+	}
+
+	for k, v := range c.Providers[provider].DynamicOptions {
 		retOptions[k] = v
 	}
 	return retOptions
