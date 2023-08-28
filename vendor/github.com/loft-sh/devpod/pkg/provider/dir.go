@@ -6,24 +6,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/loft-sh/devpod/pkg/id"
 )
 
 const (
-	WorkspaceConfigFile = "workspace.json"
-	MachineConfigFile   = "machine.json"
-	EngineConfigFile    = "engine.json"
-	ProviderConfigFile  = "provider.json"
+	WorkspaceConfigFile   = "workspace.json"
+	MachineConfigFile     = "machine.json"
+	ProInstanceConfigFile = "pro.json"
+	ProviderConfigFile    = "provider.json"
 )
 
-func GetEnginesDir(context string) (string, error) {
+func GetProInstancesDir(context string) (string, error) {
 	configDir, err := config.GetConfigDir()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(configDir, "contexts", context, "engines"), nil
+	return filepath.Join(configDir, "contexts", context, "pro"), nil
 }
 
 func GetMachinesDir(context string) (string, error) {
@@ -106,9 +109,9 @@ func GetWorkspaceDir(context, workspaceID string) (string, error) {
 	return filepath.Join(configDir, "contexts", context, "workspaces", workspaceID), nil
 }
 
-func GetEngineDir(context, engineID string) (string, error) {
-	if engineID == "" {
-		return "", fmt.Errorf("engine id is empty")
+func GetProInstanceDir(context, proInstanceHost string) (string, error) {
+	if proInstanceHost == "" {
+		return "", fmt.Errorf("pro instance host is empty")
 	}
 
 	configDir, err := config.GetConfigDir()
@@ -116,7 +119,18 @@ func GetEngineDir(context, engineID string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(configDir, "contexts", context, "engines", engineID), nil
+	return filepath.Join(configDir, "contexts", context, "pro", ToProInstanceID(proInstanceHost)), nil
+}
+
+var proInstanceIDRegEx1 = regexp.MustCompile(`[^\w\-]`)
+var proInstanceIDRegEx2 = regexp.MustCompile(`[^0-9a-z\-]+`)
+
+func ToProInstanceID(url string) string {
+	url = strings.TrimPrefix(url, "https://")
+	url = strings.ToLower(url)
+	url = proInstanceIDRegEx2.ReplaceAllString(proInstanceIDRegEx1.ReplaceAllString(url, "-"), "")
+	url = strings.Trim(url, "-")
+	return id.SafeConcatNameMax([]string{url}, 32)
 }
 
 func WorkspaceExists(context, workspaceID string) bool {
@@ -129,13 +143,13 @@ func WorkspaceExists(context, workspaceID string) bool {
 	return err == nil
 }
 
-func EngineExists(context, engineID string) bool {
-	engineDir, err := GetEngineDir(context, engineID)
+func ProInstanceExists(context, proInstanceID string) bool {
+	proDir, err := GetProInstanceDir(context, proInstanceID)
 	if err != nil {
 		return false
 	}
 
-	_, err = os.Stat(engineDir)
+	_, err = os.Stat(proDir)
 	return err == nil
 }
 
@@ -164,8 +178,8 @@ func SaveProviderConfig(context string, provider *ProviderConfig) error {
 	return nil
 }
 
-func SaveEngineConfig(context string, engine *Engine) error {
-	providerDir, err := GetEngineDir(context, engine.ID)
+func SaveProInstanceConfig(context string, proInstance *ProInstance) error {
+	providerDir, err := GetProInstanceDir(context, proInstance.Host)
 	if err != nil {
 		return err
 	}
@@ -175,13 +189,13 @@ func SaveEngineConfig(context string, engine *Engine) error {
 		return err
 	}
 
-	engineBytes, err := json.Marshal(engine)
+	proInstanceBytes, err := json.Marshal(proInstance)
 	if err != nil {
 		return err
 	}
 
-	engineConfigFile := filepath.Join(providerDir, EngineConfigFile)
-	err = os.WriteFile(engineConfigFile, engineBytes, 0666)
+	proInstanceConfigFile := filepath.Join(providerDir, ProInstanceConfigFile)
+	err = os.WriteFile(proInstanceConfigFile, proInstanceBytes, 0666)
 	if err != nil {
 		return err
 	}
@@ -293,25 +307,25 @@ func LoadMachineConfig(context, machineID string) (*Machine, error) {
 	return machineConfig, nil
 }
 
-func LoadEngineConfig(context, engineID string) (*Engine, error) {
-	engineDir, err := GetEngineDir(context, engineID)
+func LoadProInstanceConfig(context, proInstanceHost string) (*ProInstance, error) {
+	proDir, err := GetProInstanceDir(context, proInstanceHost)
 	if err != nil {
 		return nil, err
 	}
 
-	engineConfigFile := filepath.Join(engineDir, EngineConfigFile)
-	engineConfigBytes, err := os.ReadFile(engineConfigFile)
+	proConfigFile := filepath.Join(proDir, ProInstanceConfigFile)
+	proConfigBytes, err := os.ReadFile(proConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
-	engineConfig := &Engine{}
-	err = json.Unmarshal(engineConfigBytes, engineConfig)
+	proInstanceConfig := &ProInstance{}
+	err = json.Unmarshal(proConfigBytes, proInstanceConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return engineConfig, nil
+	return proInstanceConfig, nil
 }
 
 func LoadWorkspaceConfig(context, workspaceID string) (*Workspace, error) {
