@@ -2,13 +2,13 @@ package provider
 
 import "github.com/loft-sh/devpod/pkg/types"
 
-type Engine struct {
-	// ID is the engine id to use
-	ID string `json:"id,omitempty"`
+type ProInstance struct {
+	// Provider is the provider name this pro instance belongs to
+	Provider string `json:"provider,omitempty"`
 
-	// URL is the Loft DevPod Engine url to use
-	URL string `json:"url,omitempty"`
+	// Host is the Loft DevPod Pro host to use
+	Host string `json:"host,omitempty"`
 
-	// CreationTimestamp is the timestamp when this workspace was created
+	// CreationTimestamp is the timestamp when this pro instance was created
 	CreationTimestamp types.Time `json:"creationTimestamp,omitempty"`
 }
