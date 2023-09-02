@@ -1,10 +1,10 @@
 module github.com/dirien/devpod-provider-scaleway
 
-go 1.20
+go 1.21
 
 require (
 	github.com/loft-sh/devpod v0.3.7
-	github.com/loft-sh/log v0.0.0-20230802151259-7b546cf62355
+	github.com/loft-sh/log v0.0.0-20230824104949-bd516c25712a
 	github.com/pkg/errors v0.9.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.20
 	github.com/spf13/cobra v1.7.0
@@ -39,9 +39,9 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/term v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
