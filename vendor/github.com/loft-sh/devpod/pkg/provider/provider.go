@@ -109,87 +109,64 @@ type ProviderAgentConfig struct {
 	// Binaries is an optional field to specify a binary to execute the commands
 	Binaries map[string][]*ProviderBinary `json:"binaries,omitempty"`
 
+	// Dockerless holds custom dockerless configuration
+	Dockerless ProviderDockerlessOptions `json:"dockerless,omitempty"`
+
 	// Driver is the driver to use for deploying the devcontainer. Currently supports
 	// docker (default) or kubernetes (experimental)
 	Driver string `json:"driver,omitempty"`
 
-	// Kubernetes holds kubernetes specific configuration
-	Kubernetes ProviderKubernetesDriverConfig `json:"kubernetes,omitempty"`
-
 	// Docker holds docker specific configuration
 	Docker ProviderDockerDriverConfig `json:"docker,omitempty"`
+
+	// Custom holds custom driver specific configuration
+	Custom ProviderCustomDriverConfig `json:"custom,omitempty"`
+}
+
+type ProviderDockerlessOptions struct {
+	// Disabled signals if dockerless building is disabled
+	Disabled types.StrBool `json:"disabled,omitempty"`
+
+	// Image is the image of the dockerless container to start
+	Image string `json:"image,omitempty"`
+
+	// IgnorePaths are additional ignore paths that should be ignored during deletion
+	IgnorePaths string `json:"ignorePaths,omitempty"`
+
+	// DisableDockerCredentials prevents docker credentials from getting injected
+	DisableDockerCredentials types.StrBool `json:"disableDockerCredentials,omitempty"`
+}
+
+func (a ProviderAgentConfig) IsDockerDriver() bool {
+	return a.Driver == "" || a.Driver == DockerDriver
 }
 
 const (
-	DockerDriver     = "docker"
-	KubernetesDriver = "kubernetes"
+	DockerDriver = "docker"
+	CustomDriver = "custom"
 )
 
-type ProviderKubernetesDriverConfig struct {
-	// Path where to find the kubectl binary, defaults to 'kubectl'
-	Path string `json:"path,omitempty"`
+type ProviderCustomDriverConfig struct {
+	// FindDevContainer is used to find an existing devcontainer
+	FindDevContainer types.StrArray `json:"findDevContainer,omitempty"`
 
-	// Namespace is the Kubernetes namespace to use
-	Namespace string `json:"namespace,omitempty"`
+	// CommandDevContainer is used to execute a command in the devcontainer
+	CommandDevContainer types.StrArray `json:"commandDevContainer,omitempty"`
 
-	// CreateNamespace specifies if DevPod should try to create the namespace
-	CreateNamespace types.StrBool `json:"createNamespace,omitempty"`
+	// TargetArchitecture is used to find out the target architecture
+	TargetArchitecture types.StrArray `json:"targetArchitecture,omitempty"`
 
-	// Context is the context to use
-	Context string `json:"context,omitempty"`
+	// RunDevContainer is used to actually run the devcontainer
+	RunDevContainer types.StrArray `json:"runDevContainer,omitempty"`
 
-	// Config is the path to the kube config to use
-	Config string `json:"config,omitempty"`
+	// StartDevContainer is used to start the devcontainer
+	StartDevContainer types.StrArray `json:"startDevContainer,omitempty"`
 
-	// ClusterRole defines a role binding with the given cluster role
-	// DevPod should create.
-	ClusterRole string `json:"clusterRole,omitempty"`
+	// StopDevContainer is used to stop the devcontainer
+	StopDevContainer types.StrArray `json:"stopDevContainer,omitempty"`
 
-	// ServiceAccount is the service account to use
-	ServiceAccount string `json:"serviceAccount,omitempty"`
-
-	// Resources holds the Kubernetes resources for the workspace container
-	Resources string `json:"resources,omitempty"`
-
-	// Labels holds the Kubernetes labels for the workspace container
-	Labels string `json:"labels,omitempty"`
-
-	// NodeSelector holds the node selector for the workspace pod
-	NodeSelector string `json:"nodeSelector,omitempty"`
-
-	// BuildRepository defines the repository to push builds. If empty,
-	// DevPod will not try to build any images at all.
-	BuildRepository string `json:"buildRepository,omitempty"`
-
-	// BuildkitImage is the build kit image to use
-	BuildkitImage string `json:"buildkitImage,omitempty"`
-
-	// BuildkitPrivileged signals if pod should be ran in privileged mode
-	BuildkitPrivileged types.StrBool `json:"buildkitPrivileged,omitempty"`
-
-	// BuildkitResources holds the resources the buildkit container should have
-	BuildkitResources string `json:"buildkitResources,omitempty"`
-
-	// BuildkitNodeSelector holds the node selector for the build pod
-	BuildkitNodeSelector string `json:"buildkitNodeSelector,omitempty"`
-
-	// HelperImage is used to find out cluster architecture and copy files
-	HelperImage string `json:"helperImage,omitempty"`
-
-	// HelperResources holds the Kubernetes resources for the workspace init container
-	HelperResources string `json:"helperResources,omitempty"`
-
-	// PersistentVolumeSize is the size of the persistent volume in GB
-	PersistentVolumeSize string `json:"persistentVolumeSize,omitempty"`
-
-	// StorageClassName is the name of the custom storage class
-	StorageClassName string `json:"storageClassName,omitempty"`
-
-	// PVCAccessMode is the access mode of the PVC. ie RWO,ROX,RWX,RWOP
-	PVCAccessMode string `json:"pvcAccessMode,omitempty"`
-
-	// PodManifestTemplate is the path of the pod manifest template file
-	PodManifestTemplate string `json:"podManifestTemplate,omitempty"`
+	// DeleteDevContainer is used to delete the devcontainer
+	DeleteDevContainer types.StrArray `json:"deleteDevContainer,omitempty"`
 }
 
 type ProviderDockerDriverConfig struct {
@@ -270,9 +247,6 @@ type ProxyCommands struct {
 
 	// Status proxies the status command
 	Status types.StrArray `json:"status,omitempty"`
-
-	// ImportWorkspace proxies the import command
-	ImportWorkspace types.StrArray `json:"import,omitempty"`
 }
 
 type SubOptions struct {
