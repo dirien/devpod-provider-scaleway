@@ -3,7 +3,7 @@ module github.com/dirien/devpod-provider-scaleway
 go 1.21
 
 require (
-	github.com/loft-sh/devpod v0.4.1
+	github.com/loft-sh/devpod v0.4.2
 	github.com/loft-sh/log v0.0.0-20230824104949-bd516c25712a
 	github.com/pkg/errors v0.9.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.21
