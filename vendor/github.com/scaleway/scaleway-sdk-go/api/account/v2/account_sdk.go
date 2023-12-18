@@ -39,29 +39,16 @@ var (
 	_ = namegenerator.GetRandomName
 )
 
-// API: user related data.
-// This API allows you to manage projects.
-type API struct {
-	client *scw.Client
-}
-
-// NewAPI returns a API object from a Scaleway client.
-func NewAPI(client *scw.Client) *API {
-	return &API{
-		client: client,
-	}
-}
-
 type ListProjectsRequestOrderBy string
 
 const (
-	// Creation date ascending
+	// Creation date ascending.
 	ListProjectsRequestOrderByCreatedAtAsc = ListProjectsRequestOrderBy("created_at_asc")
-	// Creation date descending
+	// Creation date descending.
 	ListProjectsRequestOrderByCreatedAtDesc = ListProjectsRequestOrderBy("created_at_desc")
-	// Name ascending
+	// Name ascending.
 	ListProjectsRequestOrderByNameAsc = ListProjectsRequestOrderBy("name_asc")
-	// Name descending
+	// Name descending.
 	ListProjectsRequestOrderByNameDesc = ListProjectsRequestOrderBy("name_desc")
 )
 
@@ -88,43 +75,126 @@ func (enum *ListProjectsRequestOrderBy) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ListProjectsResponse: list projects response.
-type ListProjectsResponse struct {
-	// TotalCount: total number of Projects.
-	TotalCount uint32 `json:"total_count"`
-	// Projects: paginated returned Projects.
-	Projects []*Project `json:"projects"`
-}
-
 // Project: project.
 type Project struct {
 	// ID: ID of the Project.
 	ID string `json:"id"`
+
 	// Name: name of the Project.
 	Name string `json:"name"`
+
 	// OrganizationID: organization ID of the Project.
 	OrganizationID string `json:"organization_id"`
+
 	// CreatedAt: creation date of the Project.
 	CreatedAt *time.Time `json:"created_at"`
+
 	// UpdatedAt: update date of the Project.
 	UpdatedAt *time.Time `json:"updated_at"`
+
 	// Description: description of the Project.
 	Description string `json:"description"`
 }
 
-// Service API
-
+// CreateProjectRequest: create project request.
 type CreateProjectRequest struct {
 	// Name: name of the Project.
 	Name string `json:"name"`
+
 	// OrganizationID: organization ID of the Project.
 	OrganizationID string `json:"organization_id"`
+
 	// Description: description of the Project.
-	Description *string `json:"description"`
+	Description *string `json:"description,omitempty"`
 }
 
-// Deprecated: CreateProject: create a new Project for an Organization.
-// Deprecated in favor of Account API v3.
+// DeleteProjectRequest: delete project request.
+type DeleteProjectRequest struct {
+	// ProjectID: project ID of the Project.
+	ProjectID string `json:"-"`
+}
+
+// GetProjectRequest: get project request.
+type GetProjectRequest struct {
+	// ProjectID: project ID of the Project.
+	ProjectID string `json:"-"`
+}
+
+// ListProjectsRequest: list projects request.
+type ListProjectsRequest struct {
+	// OrganizationID: organization ID of the Project.
+	OrganizationID string `json:"-"`
+
+	// Name: name of the Project.
+	Name *string `json:"-"`
+
+	// Page: page number for the returned Projects.
+	Page *int32 `json:"-"`
+
+	// PageSize: maximum number of Project per page.
+	PageSize *uint32 `json:"-"`
+
+	// OrderBy: sort order of the returned Projects.
+	// Default value: created_at_asc
+	OrderBy ListProjectsRequestOrderBy `json:"-"`
+
+	// ProjectIDs: project IDs to filter for. The results will be limited to any Projects with an ID in this array.
+	ProjectIDs []string `json:"-"`
+}
+
+// ListProjectsResponse: list projects response.
+type ListProjectsResponse struct {
+	// TotalCount: total number of Projects.
+	TotalCount uint32 `json:"total_count"`
+
+	// Projects: paginated returned Projects.
+	Projects []*Project `json:"projects"`
+}
+
+// UnsafeGetTotalCount should not be used
+// Internal usage only
+func (r *ListProjectsResponse) UnsafeGetTotalCount() uint32 {
+	return r.TotalCount
+}
+
+// UnsafeAppend should not be used
+// Internal usage only
+func (r *ListProjectsResponse) UnsafeAppend(res interface{}) (uint32, error) {
+	results, ok := res.(*ListProjectsResponse)
+	if !ok {
+		return 0, errors.New("%T type cannot be appended to type %T", res, r)
+	}
+
+	r.Projects = append(r.Projects, results.Projects...)
+	r.TotalCount += uint32(len(results.Projects))
+	return uint32(len(results.Projects)), nil
+}
+
+// UpdateProjectRequest: update project request.
+type UpdateProjectRequest struct {
+	// ProjectID: project ID of the Project.
+	ProjectID string `json:"-"`
+
+	// Name: name of the Project.
+	Name *string `json:"name,omitempty"`
+
+	// Description: description of the Project.
+	Description *string `json:"description,omitempty"`
+}
+
+// This API allows you to manage projects.
+type API struct {
+	client *scw.Client
+}
+
+// NewAPI returns a API object from a Scaleway client.
+func NewAPI(client *scw.Client) *API {
+	return &API{
+		client: client,
+	}
+}
+
+// Deprecated: CreateProject: Deprecated in favor of Account API v3.
 // Generate a new Project for an Organization, specifying its configuration including name and description.
 func (s *API) CreateProject(req *CreateProjectRequest, opts ...scw.RequestOption) (*Project, error) {
 	var err error
@@ -139,9 +209,8 @@ func (s *API) CreateProject(req *CreateProjectRequest, opts ...scw.RequestOption
 	}
 
 	scwReq := &scw.ScalewayRequest{
-		Method:  "POST",
-		Path:    "/account/v2/projects",
-		Headers: http.Header{},
+		Method: "POST",
+		Path:   "/account/v2/projects",
 	}
 
 	err = scwReq.SetBody(req)
@@ -158,24 +227,7 @@ func (s *API) CreateProject(req *CreateProjectRequest, opts ...scw.RequestOption
 	return &resp, nil
 }
 
-type ListProjectsRequest struct {
-	// OrganizationID: organization ID of the Project.
-	OrganizationID string `json:"-"`
-	// Name: name of the Project.
-	Name *string `json:"-"`
-	// Page: page number for the returned Projects.
-	Page *int32 `json:"-"`
-	// PageSize: maximum number of Project per page.
-	PageSize *uint32 `json:"-"`
-	// OrderBy: sort order of the returned Projects.
-	// Default value: created_at_asc
-	OrderBy ListProjectsRequestOrderBy `json:"-"`
-	// ProjectIDs: project IDs to filter for. The results will be limited to any Projects with an ID in this array.
-	ProjectIDs []string `json:"-"`
-}
-
-// Deprecated: ListProjects: list all Projects of an Organization.
-// Deprecated in favor of Account API v3.
+// Deprecated: ListProjects: Deprecated in favor of Account API v3.
 // List all Projects of an Organization. The response will include the total number of Projects as well as their associated Organizations, names and IDs. Other information include the creation and update date of the Project.
 func (s *API) ListProjects(req *ListProjectsRequest, opts ...scw.RequestOption) (*ListProjectsResponse, error) {
 	var err error
@@ -199,10 +251,9 @@ func (s *API) ListProjects(req *ListProjectsRequest, opts ...scw.RequestOption) 
 	parameter.AddToQuery(query, "project_ids", req.ProjectIDs)
 
 	scwReq := &scw.ScalewayRequest{
-		Method:  "GET",
-		Path:    "/account/v2/projects",
-		Query:   query,
-		Headers: http.Header{},
+		Method: "GET",
+		Path:   "/account/v2/projects",
+		Query:  query,
 	}
 
 	var resp ListProjectsResponse
@@ -214,13 +265,7 @@ func (s *API) ListProjects(req *ListProjectsRequest, opts ...scw.RequestOption) 
 	return &resp, nil
 }
 
-type GetProjectRequest struct {
-	// ProjectID: project ID of the Project.
-	ProjectID string `json:"-"`
-}
-
-// Deprecated: GetProject: get an existing Project.
-// Deprecated in favor of Account API v3.
+// Deprecated: GetProject: Deprecated in favor of Account API v3.
 // Retrieve information about an existing Project, specified by its Project ID. Its full details, including ID, name and description, are returned in the response object.
 func (s *API) GetProject(req *GetProjectRequest, opts ...scw.RequestOption) (*Project, error) {
 	var err error
@@ -235,9 +280,8 @@ func (s *API) GetProject(req *GetProjectRequest, opts ...scw.RequestOption) (*Pr
 	}
 
 	scwReq := &scw.ScalewayRequest{
-		Method:  "GET",
-		Path:    "/account/v2/projects/" + fmt.Sprint(req.ProjectID) + "",
-		Headers: http.Header{},
+		Method: "GET",
+		Path:   "/account/v2/projects/" + fmt.Sprint(req.ProjectID) + "",
 	}
 
 	var resp Project
@@ -249,13 +293,7 @@ func (s *API) GetProject(req *GetProjectRequest, opts ...scw.RequestOption) (*Pr
 	return &resp, nil
 }
 
-type DeleteProjectRequest struct {
-	// ProjectID: project ID of the Project.
-	ProjectID string `json:"-"`
-}
-
-// Deprecated: DeleteProject: delete an existing Project.
-// Deprecated in favor of Account API v3.
+// Deprecated: DeleteProject: Deprecated in favor of Account API v3.
 // Delete an existing Project, specified by its Project ID. The Project needs to be empty (meaning there are no resources left in it) to be deleted effectively. Note that deleting a Project is permanent, and cannot be undone.
 func (s *API) DeleteProject(req *DeleteProjectRequest, opts ...scw.RequestOption) error {
 	var err error
@@ -270,9 +308,8 @@ func (s *API) DeleteProject(req *DeleteProjectRequest, opts ...scw.RequestOption
 	}
 
 	scwReq := &scw.ScalewayRequest{
-		Method:  "DELETE",
-		Path:    "/account/v2/projects/" + fmt.Sprint(req.ProjectID) + "",
-		Headers: http.Header{},
+		Method: "DELETE",
+		Path:   "/account/v2/projects/" + fmt.Sprint(req.ProjectID) + "",
 	}
 
 	err = s.client.Do(scwReq, nil, opts...)
@@ -282,17 +319,7 @@ func (s *API) DeleteProject(req *DeleteProjectRequest, opts ...scw.RequestOption
 	return nil
 }
 
-type UpdateProjectRequest struct {
-	// ProjectID: project ID of the Project.
-	ProjectID string `json:"-"`
-	// Name: name of the Project.
-	Name *string `json:"name"`
-	// Description: description of the Project.
-	Description *string `json:"description"`
-}
-
-// Deprecated: UpdateProject: update Project.
-// Deprecated in favor of Account API v3.
+// Deprecated: UpdateProject: Deprecated in favor of Account API v3.
 // Update the parameters of an existing Project, specified by its Project ID. These parameters include the name and description.
 func (s *API) UpdateProject(req *UpdateProjectRequest, opts ...scw.RequestOption) (*Project, error) {
 	var err error
@@ -307,9 +334,8 @@ func (s *API) UpdateProject(req *UpdateProjectRequest, opts ...scw.RequestOption
 	}
 
 	scwReq := &scw.ScalewayRequest{
-		Method:  "PATCH",
-		Path:    "/account/v2/projects/" + fmt.Sprint(req.ProjectID) + "",
-		Headers: http.Header{},
+		Method: "PATCH",
+		Path:   "/account/v2/projects/" + fmt.Sprint(req.ProjectID) + "",
 	}
 
 	err = scwReq.SetBody(req)
@@ -324,23 +350,4 @@ func (s *API) UpdateProject(req *UpdateProjectRequest, opts ...scw.RequestOption
 		return nil, err
 	}
 	return &resp, nil
-}
-
-// UnsafeGetTotalCount should not be used
-// Internal usage only
-func (r *ListProjectsResponse) UnsafeGetTotalCount() uint32 {
-	return r.TotalCount
-}
-
-// UnsafeAppend should not be used
-// Internal usage only
-func (r *ListProjectsResponse) UnsafeAppend(res interface{}) (uint32, error) {
-	results, ok := res.(*ListProjectsResponse)
-	if !ok {
-		return 0, errors.New("%T type cannot be appended to type %T", res, r)
-	}
-
-	r.Projects = append(r.Projects, results.Projects...)
-	r.TotalCount += uint32(len(results.Projects))
-	return uint32(len(results.Projects)), nil
 }
