@@ -4,14 +4,16 @@ import (
 	"strings"
 
 	"github.com/loft-sh/devpod/pkg/config"
+	devcontainerconfig "github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/git"
 	"github.com/loft-sh/devpod/pkg/types"
 )
 
 var (
-	WorkspaceSourceGit   = "git:"
-	WorkspaceSourceLocal = "local:"
-	WorkspaceSourceImage = "image:"
+	WorkspaceSourceGit       = "git:"
+	WorkspaceSourceLocal     = "local:"
+	WorkspaceSourceImage     = "image:"
+	WorkspaceSourceContainer = "container:"
 )
 
 type Workspace struct {
@@ -20,9 +22,6 @@ type Workspace struct {
 
 	// UID is used to identify this specific workspace
 	UID string `json:"uid,omitempty"`
-
-	// Folder is the local folder where workspace related contents will be stored
-	Folder string `json:"folder,omitempty"`
 
 	// Picture is the project social media image
 	Picture string `json:"picture,omitempty"`
@@ -45,6 +44,9 @@ type Workspace struct {
 	// DevContainerPath is the relative path where the devcontainer.json is located.
 	DevContainerPath string `json:"devContainerPath,omitempty"`
 
+	// DevContainerConfig holds the config for the devcontainer.json.
+	DevContainerConfig *devcontainerconfig.DevContainerConfig `json:"devContainerConfig,omitempty"`
+
 	// CreationTimestamp is the timestamp when this workspace was created
 	CreationTimestamp types.Time `json:"creationTimestamp,omitempty"`
 
@@ -59,6 +61,9 @@ type Workspace struct {
 
 	// Origin is the place where this config file was loaded from
 	Origin string `json:"-"`
+
+	// Path to the file where the SSH config to access the workspace is stored
+	SSHConfigPath string `json:"sshConfigPath,omitempty"`
 }
 
 type WorkspaceIDEConfig struct {
@@ -72,9 +77,6 @@ type WorkspaceIDEConfig struct {
 type WorkspaceMachineConfig struct {
 	// ID is the machine ID to use for this workspace
 	ID string `json:"machineId,omitempty"`
-
-	// UID is the machine UID to use for this workspace
-	UID string `json:"machineUid,omitempty"`
 
 	// AutoDelete specifies if the machine should get destroyed when
 	// the workspace is destroyed
@@ -107,6 +109,9 @@ type WorkspaceSource struct {
 
 	// Image is the docker image to use
 	Image string `json:"image,omitempty"`
+
+	// Container is the container to use
+	Container string `json:"container,omitempty"`
 }
 
 type ContainerWorkspaceInfo struct {
@@ -125,8 +130,15 @@ type ContainerWorkspaceInfo struct {
 }
 
 type AgentWorkspaceInfo struct {
+	// WorkspaceOrigin is the path where this workspace config originated from
+	WorkspaceOrigin string `json:"workspaceOrigin,omitempty"`
+
 	// Workspace holds the workspace info
 	Workspace *Workspace `json:"workspace,omitempty"`
+
+	// LastDevContainerConfig can be used as a fallback if the workspace was already started
+	// and we lost track of the devcontainer.json
+	LastDevContainerConfig *devcontainerconfig.DevContainerConfigWithPath `json:"lastDevContainerConfig,omitempty"`
 
 	// Machine holds the machine info
 	Machine *Machine `json:"machine,omitempty"`
@@ -173,6 +185,13 @@ type CLIOptions struct {
 	ForceInternalBuildKit bool `json:"forceInternalBuildKit,omitempty"`
 }
 
+type BuildOptions struct {
+	CLIOptions
+
+	Platform string
+	NoBuild  bool
+}
+
 func (w WorkspaceSource) String() string {
 	if w.GitRepository != "" {
 		if w.GitPRReference != "" {
@@ -188,6 +207,8 @@ func (w WorkspaceSource) String() string {
 		return WorkspaceSourceLocal + w.LocalFolder
 	} else if w.Image != "" {
 		return WorkspaceSourceImage + w.Image
+	} else if w.Container != "" {
+		return WorkspaceSourceContainer + w.Container
 	}
 
 	return ""
@@ -209,6 +230,10 @@ func ParseWorkspaceSource(source string) *WorkspaceSource {
 	} else if strings.HasPrefix(source, WorkspaceSourceImage) {
 		return &WorkspaceSource{
 			Image: strings.TrimPrefix(source, WorkspaceSourceImage),
+		}
+	} else if strings.HasPrefix(source, WorkspaceSourceContainer) {
+		return &WorkspaceSource{
+			Container: strings.TrimPrefix(source, WorkspaceSourceContainer),
 		}
 	}
 
