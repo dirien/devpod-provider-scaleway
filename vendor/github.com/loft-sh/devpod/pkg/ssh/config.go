@@ -21,24 +21,15 @@ var (
 	MarkerEndPrefix   = "# DevPod End "
 )
 
-func ConfigureSSHConfig(configPath, context, workspace, user string, gpgagent bool, log log.Logger) error {
-	return configureSSHConfigSameFile(configPath, context, workspace, user, "", gpgagent, log)
+func ConfigureSSHConfig(sshConfigPath, context, workspace, user, workdir string, gpgagent bool, log log.Logger) error {
+	return configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, "", gpgagent, log)
 }
 
-func configureSSHConfigSameFile(configPath, context, workspace, user, command string, gpgagent bool, log log.Logger) error {
+func configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, command string, gpgagent bool, log log.Logger) error {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	sshConfigPath := configPath
-	if sshConfigPath == "" {
-		var err error
-		sshConfigPath, err = getSSHConfig()
-		if err != nil {
-			return err
-		}
-	}
-
-	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, command, gpgagent)
+	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, workdir, command, gpgagent)
 	if err != nil {
 		return errors.Wrap(err, "parse ssh config")
 	}
@@ -52,7 +43,7 @@ type DevPodSSHEntry struct {
 	Workspace string
 }
 
-func addHost(path, host, user, context, workspace, command string, gpgagent bool) (string, error) {
+func addHost(path, host, user, context, workspace, workdir, command string, gpgagent bool) (string, error) {
 	newConfig, err := removeFromConfig(path, host)
 	if err != nil {
 		return "", err
@@ -79,21 +70,26 @@ func addHost(path, host, user, context, workspace, command string, gpgagent bool
 	} else if gpgagent {
 		newLines = append(newLines, fmt.Sprintf("  ProxyCommand %s ssh --gpg-agent-forwarding --stdio --context %s --user %s %s", execPath, context, user, workspace))
 	} else {
-		newLines = append(newLines, fmt.Sprintf("  ProxyCommand %s ssh --stdio --context %s --user %s %s", execPath, context, user, workspace))
+		proxyCommand := fmt.Sprintf("  ProxyCommand %s ssh --stdio --context %s --user %s %s", execPath, context, user, workspace)
+		if workdir != "" {
+			proxyCommand = fmt.Sprintf("%s --workdir %s", proxyCommand, workdir)
+		}
+		newLines = append(newLines, proxyCommand)
 	}
 	newLines = append(newLines, "  User "+user)
 	newLines = append(newLines, endMarker)
 	return strings.Join(newLines, "\n"), nil
 }
 
-func GetUser(workspace string) (string, error) {
-	sshConfigPath, err := getSSHConfig()
+func GetUser(workspaceID string, sshConfigPath string) (string, error) {
+	path, err := ResolveSSHConfigPath(sshConfigPath)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "Invalid ssh config path")
 	}
+	sshConfigPath = path
 
 	user := "root"
-	_, err = transformHostSection(sshConfigPath, workspace+"."+"devpod", func(line string) string {
+	_, err = transformHostSection(sshConfigPath, workspaceID+"."+"devpod", func(line string) string {
 		splitted := strings.Split(strings.ToLower(strings.TrimSpace(line)), " ")
 		if len(splitted) == 2 && splitted[0] == "user" {
 			user = strings.Trim(splitted[1], "\"")
@@ -108,16 +104,11 @@ func GetUser(workspace string) (string, error) {
 	return user, nil
 }
 
-func RemoveFromConfig(workspace string, log log.Logger) error {
+func RemoveFromConfig(workspaceID string, sshConfigPath string, log log.Logger) error {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	sshConfigPath, err := getSSHConfig()
-	if err != nil {
-		return err
-	}
-
-	newFile, err := removeFromConfig(sshConfigPath, workspace+"."+"devpod")
+	newFile, err := removeFromConfig(sshConfigPath, workspaceID+"."+"devpod")
 	if err != nil {
 		return errors.Wrap(err, "parse ssh config")
 	}
@@ -139,13 +130,21 @@ func writeSSHConfig(path, content string, log log.Logger) error {
 	return nil
 }
 
-func getSSHConfig() (string, error) {
+func ResolveSSHConfigPath(sshConfigPath string) (string, error) {
 	homeDir, err := homedir.Dir()
 	if err != nil {
 		return "", errors.Wrap(err, "get home dir")
 	}
 
-	return filepath.Join(homeDir, ".ssh", "config"), nil
+	if sshConfigPath == "" {
+		return filepath.Join(homeDir, ".ssh", "config"), nil
+	}
+
+	if strings.HasPrefix(sshConfigPath, "~/") {
+		sshConfigPath = strings.Replace(sshConfigPath, "~", homeDir, 1)
+	}
+
+	return filepath.Abs(sshConfigPath)
 }
 
 func removeFromConfig(path, host string) (string, error) {
