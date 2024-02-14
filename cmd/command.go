@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/dirien/devpod-provider-scaleway/pkg/scaleway"
-	"github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/devpod/pkg/ssh"
 	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
@@ -27,11 +26,9 @@ func NewCommandCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
 			return cmd.Run(
 				context.Background(),
 				scalewayProvider,
-				provider.FromEnvironment(),
 				log.Default,
 			)
 		},
@@ -44,7 +41,6 @@ func NewCommandCmd() *cobra.Command {
 func (cmd *CommandCmd) Run(
 	ctx context.Context,
 	providerScaleway *scaleway.ScalewayProvider,
-	machine *provider.Machine,
 	logs log.Logger,
 ) error {
 	command := os.Getenv("COMMAND")
