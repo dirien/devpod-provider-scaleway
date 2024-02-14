@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/dirien/devpod-provider-scaleway/pkg/scaleway"
-	"github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/log"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +26,6 @@ func NewDeleteCmd() *cobra.Command {
 			return cmd.Run(
 				context.Background(),
 				scalewayProvider,
-				provider.FromEnvironment(),
 				log.Default,
 			)
 		},
@@ -40,7 +38,6 @@ func NewDeleteCmd() *cobra.Command {
 func (cmd *DeleteCmd) Run(
 	ctx context.Context,
 	providerScaleway *scaleway.ScalewayProvider,
-	machine *provider.Machine,
 	logs log.Logger,
 ) error {
 	return scaleway.Delete(providerScaleway)
