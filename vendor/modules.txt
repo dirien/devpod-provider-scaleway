@@ -112,7 +112,7 @@ github.com/moby/term/windows
 github.com/pkg/errors
 # github.com/rogpeppe/go-internal v1.11.0
 ## explicit; go 1.19
-# github.com/scaleway/scaleway-sdk-go v1.0.0-beta.22
+# github.com/scaleway/scaleway-sdk-go v1.0.0-beta.23
 ## explicit; go 1.17
 github.com/scaleway/scaleway-sdk-go/api/account/v2
 github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1
