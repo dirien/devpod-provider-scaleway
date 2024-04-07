@@ -74,7 +74,7 @@ github.com/loft-sh/devpod/pkg/telemetry/types
 github.com/loft-sh/devpod/pkg/types
 github.com/loft-sh/devpod/pkg/util/hash
 github.com/loft-sh/devpod/pkg/version
-# github.com/loft-sh/log v0.0.0-20230824104949-bd516c25712a
+# github.com/loft-sh/log v0.0.0-20240219160058-26d83ffb46ac
 ## explicit; go 1.20
 github.com/loft-sh/log
 github.com/loft-sh/log/hash
@@ -142,7 +142,7 @@ github.com/spf13/pflag
 # github.com/tidwall/jsonc v0.3.2
 ## explicit; go 1.16
 github.com/tidwall/jsonc
-# golang.org/x/crypto v0.21.0
+# golang.org/x/crypto v0.22.0
 ## explicit; go 1.18
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -154,14 +154,14 @@ golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/sys v0.18.0
+# golang.org/x/sys v0.19.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.18.0
+# golang.org/x/term v0.19.0
 ## explicit; go 1.18
 golang.org/x/term
 # golang.org/x/text v0.14.0
