@@ -3,7 +3,7 @@ module github.com/dirien/devpod-provider-scaleway
 go 1.21
 
 require (
-	github.com/loft-sh/devpod v0.5.6
+	github.com/loft-sh/devpod v0.5.7
 	github.com/loft-sh/log v0.0.0-20240219160058-26d83ffb46ac
 	github.com/pkg/errors v0.9.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.26
@@ -44,7 +44,7 @@ require (
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
