@@ -18,7 +18,7 @@ const (
 )
 
 type Cloner interface {
-	Clone(ctx context.Context, repository string, targetDir string, extraArgs []string, stdout, stderr io.Writer) error
+	Clone(ctx context.Context, repository string, targetDir string, extraArgs, extraEnv []string, stdout, stderr io.Writer) error
 }
 
 func NewCloner(strategy CloneStrategy) Cloner {
@@ -52,9 +52,11 @@ func (s *CloneStrategy) Set(v string) error {
 		return fmt.Errorf("CloneStrategy %s not supported", v)
 	}
 }
+
 func (s *CloneStrategy) Type() string {
 	return "cloneStrategy"
 }
+
 func (s *CloneStrategy) String() string {
 	return string(*s)
 }
@@ -63,49 +65,51 @@ type fullClone struct{}
 
 var _ Cloner = &fullClone{}
 
-func (c *fullClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs []string, stdout, stderr io.Writer) error {
+func (c *fullClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs, extraEnv []string, stdout, stderr io.Writer) error {
 	args := []string{"clone"}
 	args = append(args, extraArgs...)
 	args = append(args, repository, targetDir)
-	return run(ctx, args, stdout, stderr)
+	return run(ctx, args, extraEnv, stdout, stderr)
 }
 
 type bloblessClone struct{}
 
 var _ Cloner = &bloblessClone{}
 
-func (c *bloblessClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs []string, stdout, stderr io.Writer) error {
+func (c *bloblessClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs, extraEnv []string, stdout, stderr io.Writer) error {
 	args := []string{"clone", "--filter=blob:none"}
 	args = append(args, extraArgs...)
 	args = append(args, repository, targetDir)
-	return run(ctx, args, stdout, stderr)
+	return run(ctx, args, extraEnv, stdout, stderr)
 }
 
 type treelessClone struct{}
 
 var _ Cloner = treelessClone{}
 
-func (c treelessClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs []string, stdout, stderr io.Writer) error {
+func (c treelessClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs, extraEnv []string, stdout, stderr io.Writer) error {
 	args := []string{"clone", "--filter=tree:0"}
 	args = append(args, extraArgs...)
 	args = append(args, repository, targetDir)
-	return run(ctx, args, stdout, stderr)
+	return run(ctx, args, extraEnv, stdout, stderr)
 }
 
 type shallowClone struct{}
 
 var _ Cloner = shallowClone{}
 
-func (c shallowClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs []string, stdout, stderr io.Writer) error {
+func (c shallowClone) Clone(ctx context.Context, repository string, targetDir string, extraArgs, extraEnv []string, stdout, stderr io.Writer) error {
 	args := []string{"clone", "--depth=1"}
 	args = append(args, extraArgs...)
 	args = append(args, repository, targetDir)
-	return run(ctx, args, stdout, stderr)
+	return run(ctx, args, extraEnv, stdout, stderr)
 }
 
-func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func run(ctx context.Context, args []string, extraEnv []string, stdout, stderr io.Writer) error {
 	gitCommand := CommandContext(ctx, args...)
 	gitCommand.Stdout = stdout
 	gitCommand.Stderr = stderr
+	gitCommand.Env = append(gitCommand.Env, extraEnv...)
+
 	return gitCommand.Run()
 }
