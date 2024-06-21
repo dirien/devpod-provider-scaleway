@@ -147,14 +147,17 @@ func Delete(scalewayProvider *ScalewayProvider) error {
 	if err != nil {
 		return err
 	}
-	duration := 2 * time.Second
-	err = scalewayProvider.InstanceAPI.ServerActionAndWait(&instance.ServerActionAndWaitRequest{
-		ServerID:      devPodInstance.Server.ID,
-		Action:        instance.ServerActionPoweroff,
-		RetryInterval: &duration,
-	})
-	if err != nil {
-		return err
+
+	if devPodInstance.Server.State == instance.ServerStateRunning {
+		duration := 2 * time.Second
+		err = scalewayProvider.InstanceAPI.ServerActionAndWait(&instance.ServerActionAndWaitRequest{
+			ServerID:      devPodInstance.Server.ID,
+			Action:        instance.ServerActionPoweroff,
+			RetryInterval: &duration,
+		})
+		if err != nil {
+			return err
+		}
 	}
 	err = scalewayProvider.InstanceAPI.DeleteServer(&instance.DeleteServerRequest{
 		ServerID: devPodInstance.Server.ID,
