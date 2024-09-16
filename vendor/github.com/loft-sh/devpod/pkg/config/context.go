@@ -13,6 +13,8 @@ const (
 	ContextOptionDotfilesScript             = "DOTFILES_SCRIPT"
 	ContextOptionSSHAgentForwarding         = "SSH_AGENT_FORWARDING"
 	ContextOptionSSHConfigPath              = "SSH_CONFIG_PATH"
+	ContextOptionAgentInjectTimeout         = "AGENT_INJECT_TIMEOUT"
+	ContextOptionRegistryCache              = "REGISTRY_CACHE"
 )
 
 var ContextOptions = []ContextOption{
@@ -79,5 +81,15 @@ var ContextOptions = []ContextOption{
 	{
 		Name:        ContextOptionSSHConfigPath,
 		Description: "Specifies the path where the ssh config should be written to",
+	},
+	{
+		Name:        ContextOptionAgentInjectTimeout,
+		Description: "Specifies the timeout to inject the agent",
+		Default:     "20",
+	},
+	{
+		Name:        ContextOptionRegistryCache,
+		Description: "Specifies the registry to use as a build cache, e.g. gcr.io/my-project/my-dev-env",
+		Default:     "",
 	},
 }
