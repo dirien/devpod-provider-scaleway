@@ -1,10 +1,13 @@
 package ssh
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -21,15 +24,15 @@ var (
 	MarkerEndPrefix   = "# DevPod End "
 )
 
-func ConfigureSSHConfig(sshConfigPath, context, workspace, user, workdir string, gpgagent bool, log log.Logger) error {
-	return configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, "", gpgagent, log)
+func ConfigureSSHConfig(sshConfigPath, context, workspace, user, workdir string, gpgagent bool, devPodHome string, log log.Logger) error {
+	return configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, "", gpgagent, devPodHome, log)
 }
 
-func configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, command string, gpgagent bool, log log.Logger) error {
+func configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, command string, gpgagent bool, devPodHome string, log log.Logger) error {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, workdir, command, gpgagent)
+	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, workdir, command, gpgagent, devPodHome)
 	if err != nil {
 		return errors.Wrap(err, "parse ssh config")
 	}
@@ -43,12 +46,11 @@ type DevPodSSHEntry struct {
 	Workspace string
 }
 
-func addHost(path, host, user, context, workspace, workdir, command string, gpgagent bool) (string, error) {
+func addHost(path, host, user, context, workspace, workdir, command string, gpgagent bool, devPodHome string) (string, error) {
 	newConfig, err := removeFromConfig(path, host)
 	if err != nil {
 		return "", err
 	}
-	newLines := []string{}
 
 	// get path to executable
 	execPath, err := os.Executable()
@@ -56,6 +58,11 @@ func addHost(path, host, user, context, workspace, workdir, command string, gpga
 		return "", err
 	}
 
+	return addHostSection(newConfig, execPath, host, user, context, workspace, workdir, command, gpgagent, devPodHome)
+}
+
+func addHostSection(config, execPath, host, user, context, workspace, workdir, command string, gpgagent bool, devPodHome string) (string, error) {
+	newLines := []string{}
 	// add new section
 	startMarker := MarkerStartPrefix + host
 	endMarker := MarkerEndPrefix + host
@@ -66,26 +73,67 @@ func addHost(path, host, user, context, workspace, workdir, command string, gpga
 	newLines = append(newLines, "  StrictHostKeyChecking no")
 	newLines = append(newLines, "  UserKnownHostsFile /dev/null")
 	newLines = append(newLines, "  HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa")
+
+	proxyCommand := ""
 	if command != "" {
-		newLines = append(newLines, fmt.Sprintf("  ProxyCommand \"%s\"", command))
-	} else if gpgagent {
-		newLines = append(newLines, fmt.Sprintf("  ProxyCommand \"%s\" ssh --gpg-agent-forwarding --stdio --context %s --user %s %s", execPath, context, user, workspace))
+		proxyCommand = fmt.Sprintf("  ProxyCommand \"%s\"", command)
 	} else {
-		proxyCommand := fmt.Sprintf("  ProxyCommand \"%s\" ssh --stdio --context %s --user %s %s", execPath, context, user, workspace)
-		if workdir != "" {
-			proxyCommand = fmt.Sprintf("%s --workdir %s", proxyCommand, workdir)
-		}
-		newLines = append(newLines, proxyCommand)
+		proxyCommand = fmt.Sprintf("  ProxyCommand \"%s\" ssh --stdio --context %s --user %s %s", execPath, context, user, workspace)
 	}
+
+	if devPodHome != "" {
+		proxyCommand = fmt.Sprintf("%s --devpod-home \"%s\"", proxyCommand, devPodHome)
+	}
+	if workdir != "" {
+		proxyCommand = fmt.Sprintf("%s --workdir \"%s\"", proxyCommand, workdir)
+	}
+	if gpgagent {
+		proxyCommand = fmt.Sprintf("%s --gpg-agent-forwarding", proxyCommand)
+	}
+	newLines = append(newLines, proxyCommand)
 	newLines = append(newLines, "  User "+user)
 	newLines = append(newLines, endMarker)
-	// add a space between blocks
-	newLines = append(newLines, "")
 
 	// now we append the original config
-	// keep our blocks on top of the file for priority reasons
-	newLines = append(newLines, newConfig)
-	return strings.Join(newLines, "\n"), nil
+	// keep our blocks on top of the hosts for priority reasons, but below any includes
+	lineNumber := 0
+	found := false
+	lines := []string{}
+	commentLines := 0
+	scanner := bufio.NewScanner(strings.NewReader(config))
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Check `Host` keyword
+		if strings.HasPrefix(strings.TrimSpace(line), "Host") && !found {
+			found = true
+			lineNumber = max(lineNumber-commentLines, 0)
+		}
+
+		// Preserve comments
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			commentLines++
+		} else {
+			commentLines = 0
+		}
+
+		if !found {
+			lineNumber++
+		}
+
+		lines = append(lines, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return config, err
+	}
+
+	lines = slices.Insert(lines, lineNumber, newLines...)
+
+	newLineSep := "\n"
+	if runtime.GOOS == "windows" {
+		newLineSep = "\r\n"
+	}
+
+	return strings.Join(lines, newLineSep), nil
 }
 
 func GetUser(workspaceID string, sshConfigPath string) (string, error) {
