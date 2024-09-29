@@ -9,11 +9,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
+
+	"github.com/muesli/cancelreader"
+	"golang.org/x/term"
 
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
@@ -41,7 +45,7 @@ func oneIf(b bool) int {
 	return 0
 }
 
-// atoi is like strconv.Atoi, but it ignores errors and trims whitespace.
+// atoi is like [strconv.Atoi], but it ignores errors and trims whitespace.
 func atoi(s string) int {
 	s = strings.TrimSpace(s)
 	n, _ := strconv.Atoi(s)
@@ -166,7 +170,7 @@ func (r *Runner) builtinCode(ctx context.Context, pos syntax.Pos, name string, a
 		}
 	case "break", "continue":
 		if !r.inLoop {
-			r.errf("%s is only useful in a loop", name)
+			r.errf("%s is only useful in a loop\n", name)
 			break
 		}
 		enclosing := &r.breakEnclosing
@@ -560,9 +564,12 @@ func (r *Runner) builtinCode(ctx context.Context, pos syntax.Pos, name string, a
 	case "read":
 		var prompt string
 		raw := false
+		silent := false
 		fp := flagParser{remaining: args}
 		for fp.more() {
 			switch flag := fp.flag(); flag {
+			case "-s":
+				silent = true
 			case "-r":
 				raw = true
 			case "-p":
@@ -589,12 +596,15 @@ func (r *Runner) builtinCode(ctx context.Context, pos syntax.Pos, name string, a
 			r.out(prompt)
 		}
 
-		line, err := r.readLine(raw)
-		if err != nil {
-			return 1
+		var line []byte
+		var err error
+		if silent {
+			line, err = term.ReadPassword(int(syscall.Stdin))
+		} else {
+			line, err = r.readLine(ctx, raw)
 		}
 		if len(args) == 0 {
-			args = append(args, "REPLY")
+			args = append(args, shellReplyVar)
 		}
 
 		values := expand.ReadFields(r.ecfg, string(line), len(args), raw)
@@ -604,6 +614,12 @@ func (r *Runner) builtinCode(ctx context.Context, pos syntax.Pos, name string, a
 				val = values[i]
 			}
 			r.setVarString(name, val)
+		}
+
+		// We can get data back from readLine and an error at the same time, so
+		// check err after we process the data.
+		if err != nil {
+			return 1
 		}
 
 		return 0
@@ -752,7 +768,7 @@ func (r *Runner) builtinCode(ctx context.Context, pos syntax.Pos, name string, a
 				words = append(words, w)
 				return true
 			}); err != nil {
-				r.errf("alias: could not parse %q: %v", src, err)
+				r.errf("alias: could not parse %q: %v\n", src, err)
 				continue
 			}
 
@@ -869,7 +885,7 @@ func (r *Runner) builtinCode(ctx context.Context, pos syntax.Pos, name string, a
 			vr.List = append(vr.List, scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
-			r.errf("%s: unable to read, %v", name, err)
+			r.errf("%s: unable to read, %v\n", name, err)
 			return 2
 		}
 		r.setVarInternal(arrayName, vr)
@@ -878,13 +894,14 @@ func (r *Runner) builtinCode(ctx context.Context, pos syntax.Pos, name string, a
 
 	default:
 		// "umask", "fg", "bg",
-		panic(fmt.Sprintf("unhandled builtin: %s", name))
+		r.errf("%s: unimplemented builtin\n", name)
+		return 2
 	}
 	return 0
 }
 
-// mapfileSplit returns a suitable Split function for a bufio.Scanner, the code
-// is mostly stolen from bufio.ScanLines.
+// mapfileSplit returns a suitable Split function for a [bufio.Scanner];
+// the code is mostly stolen from [bufio.ScanLines].
 func mapfileSplit(delim byte, dropDelim bool) func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	return func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if atEOF && len(data) == 0 {
@@ -916,7 +933,7 @@ func (r *Runner) printOptLine(name string, enabled, supported bool) {
 	r.outf("%s\t%s\t(%q not supported)\n", name, state, r.optStatusText(!enabled))
 }
 
-func (r *Runner) readLine(raw bool) ([]byte, error) {
+func (r *Runner) readLine(ctx context.Context, raw bool) ([]byte, error) {
 	if r.stdin == nil {
 		return nil, errors.New("interp: can't read, there's no stdin")
 	}
@@ -924,9 +941,34 @@ func (r *Runner) readLine(raw bool) ([]byte, error) {
 	var line []byte
 	esc := false
 
+	cr, err := cancelreader.NewReader(r.stdin)
+	if err != nil {
+		return nil, err
+	}
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		select {
+		case <-ctx.Done():
+			cr.Cancel()
+		case <-done:
+		}
+		wg.Done()
+	}()
+	defer func() {
+		close(done)
+		wg.Wait()
+		// Could put the Close in the above goroutine, but if "read" is
+		// immediately called again, the Close might overlap with creating a
+		// new cancelreader. Want this cancelreader to be completely closed
+		// by the time readLine returns.
+		cr.Close()
+	}()
+
 	for {
 		var buf [1]byte
-		n, err := r.stdin.Read(buf[:])
+		n, err := cr.Read(buf[:])
 		if n > 0 {
 			b := buf[0]
 			switch {
@@ -944,11 +986,8 @@ func (r *Runner) readLine(raw bool) ([]byte, error) {
 				esc = false
 			}
 		}
-		if err == io.EOF && len(line) > 0 {
-			return line, nil
-		}
 		if err != nil {
-			return nil, err
+			return line, err
 		}
 	}
 }
@@ -962,7 +1001,7 @@ func (r *Runner) changeDir(ctx context.Context, path string) int {
 	if err != nil || !info.IsDir() {
 		return 1
 	}
-	if !hasPermissionToDir(info) {
+	if !hasPermissionToDir(path) {
 		return 1
 	}
 	r.Dir = path
@@ -978,7 +1017,7 @@ func absPath(dir, path string) string {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(dir, path)
 	}
-	return filepath.Clean(path)
+	return filepath.Clean(path) // TODO: this clean is likely unnecessary
 }
 
 func (r *Runner) absPath(path string) string {
