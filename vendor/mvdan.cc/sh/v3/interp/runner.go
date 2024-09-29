@@ -9,11 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"math/rand"
 	"os"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +23,17 @@ import (
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/pattern"
 	"mvdan.cc/sh/v3/syntax"
+)
+
+const (
+	// shellReplyPS3Var, or PS3, is a special variable in Bash used by the select command,
+	// while the shell is awaiting for input. the default value is shellDefaultPS3
+	shellReplyPS3Var = "PS3"
+	// shellDefaultPS3, or #?, is PS3's default value
+	shellDefaultPS3 = "#? "
+	// shellReplyVar, or REPLY, is a special variable in Bash that is used to store the result of
+	// the select command or of the read command, when no variable name is specified
+	shellReplyVar = "REPLY"
 )
 
 func (r *Runner) fillExpandConfig(ctx context.Context) {
@@ -93,20 +106,20 @@ func (r *Runner) fillExpandConfig(ctx context.Context) {
 				case syntax.CmdIn:
 					f, err := os.OpenFile(path, os.O_WRONLY, 0)
 					if err != nil {
-						r.errf("cannot open fifo for stdout: %v", err)
+						r.errf("cannot open fifo for stdout: %v\n", err)
 						return
 					}
 					r2.stdout = f
 					defer func() {
 						if err := f.Close(); err != nil {
-							r.errf("closing stdout fifo: %v", err)
+							r.errf("closing stdout fifo: %v\n", err)
 						}
 						os.Remove(path)
 					}()
 				default: // syntax.CmdOut
 					f, err := os.OpenFile(path, os.O_RDONLY, 0)
 					if err != nil {
-						r.errf("cannot open fifo for stdin: %v", err)
+						r.errf("cannot open fifo for stdin: %v\n", err)
 						return
 					}
 					r2.stdin = f
@@ -143,13 +156,14 @@ func catShortcutArg(stmt *syntax.Stmt) *syntax.Word {
 
 func (r *Runner) updateExpandOpts() {
 	if r.opts[optNoGlob] {
-		r.ecfg.ReadDir = nil
+		r.ecfg.ReadDir2 = nil
 	} else {
-		r.ecfg.ReadDir = func(s string) ([]os.FileInfo, error) {
+		r.ecfg.ReadDir2 = func(s string) ([]fs.DirEntry, error) {
 			return r.readDirHandler(r.handlerCtx(context.Background()), s)
 		}
 	}
 	r.ecfg.GlobStar = r.opts[optGlobStar]
+	r.ecfg.NoCaseGlob = r.opts[optNoCaseGlob]
 	r.ecfg.NullGlob = r.opts[optNullGlob]
 	r.ecfg.NoUnset = r.opts[optNoUnset]
 }
@@ -244,11 +258,11 @@ func (r *Runner) out(s string) {
 	io.WriteString(r.stdout, s)
 }
 
-func (r *Runner) outf(format string, a ...interface{}) {
+func (r *Runner) outf(format string, a ...any) {
 	fmt.Fprintf(r.stdout, format, a...)
 }
 
-func (r *Runner) errf(format string, a ...interface{}) {
+func (r *Runner) errf(format string, a ...any) {
 	fmt.Fprintf(r.stderr, format, a...)
 }
 
@@ -327,18 +341,18 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 	tracingEnabled := r.opts[optXTrace]
 	trace := r.tracer()
 
-	switch x := cm.(type) {
+	switch cm := cm.(type) {
 	case *syntax.Block:
-		r.stmts(ctx, x.Stmts)
+		r.stmts(ctx, cm.Stmts)
 	case *syntax.Subshell:
 		r2 := r.Subshell()
-		r2.stmts(ctx, x.Stmts)
+		r2.stmts(ctx, cm.Stmts)
 		r.exit = r2.exit
 		r.setErr(r2.err)
 	case *syntax.CallExpr:
 		// Use a new slice, to not modify the slice in the alias map.
 		var args []*syntax.Word
-		left := x.Args
+		left := cm.Args
 		for len(left) > 0 && r.opts[optExpandAliases] {
 			als, ok := r.alias[left[0].Lit()]
 			if !ok {
@@ -354,7 +368,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		r.lastExpandExit = 0
 		fields := r.fields(args...)
 		if len(fields) == 0 {
-			for _, as := range x.Assigns {
+			for _, as := range cm.Assigns {
 				vr := r.assignVal(as, "")
 				r.setVar(as.Name.Value, as.Index, vr)
 
@@ -391,7 +405,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		}
 		var restores []restoreVar
 
-		for _, as := range x.Assigns {
+		for _, as := range cm.Assigns {
 			name := as.Name.Value
 			origVr := r.lookupVar(name)
 
@@ -407,19 +421,19 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		trace.call(fields[0], fields[1:]...)
 		trace.newLineFlush()
 
-		r.call(ctx, x.Args[0].Pos(), fields)
+		r.call(ctx, cm.Args[0].Pos(), fields)
 		for _, restore := range restores {
 			r.setVarInternal(restore.name, restore.vr)
 		}
 	case *syntax.BinaryCmd:
-		switch x.Op {
+		switch cm.Op {
 		case syntax.AndStmt, syntax.OrStmt:
 			oldNoErrExit := r.noErrExit
 			r.noErrExit = true
-			r.stmt(ctx, x.X)
+			r.stmt(ctx, cm.X)
 			r.noErrExit = oldNoErrExit
-			if (r.exit == 0) == (x.Op == syntax.AndStmt) {
-				r.stmt(ctx, x.Y)
+			if (r.exit == 0) == (cm.Op == syntax.AndStmt) {
+				r.stmt(ctx, cm.Y)
 			}
 		case syntax.Pipe, syntax.PipeAll:
 			pr, pw, err := os.Pipe()
@@ -429,7 +443,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 			}
 			r2 := r.Subshell()
 			r2.stdout = pw
-			if x.Op == syntax.PipeAll {
+			if cm.Op == syntax.PipeAll {
 				r2.stderr = pw
 			} else {
 				r2.stderr = r.stderr
@@ -438,47 +452,48 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				r2.stmt(ctx, x.X)
+				r2.stmt(ctx, cm.X)
 				pw.Close()
 				wg.Done()
 			}()
-			r.stmt(ctx, x.Y)
+			r.stmt(ctx, cm.Y)
 			pr.Close()
 			wg.Wait()
 			if r.opts[optPipeFail] && r2.exit != 0 && r.exit == 0 {
 				r.exit = r2.exit
+				r.shellExited = r2.shellExited
 			}
 			r.setErr(r2.err)
 		}
 	case *syntax.IfClause:
 		oldNoErrExit := r.noErrExit
 		r.noErrExit = true
-		r.stmts(ctx, x.Cond)
+		r.stmts(ctx, cm.Cond)
 		r.noErrExit = oldNoErrExit
 
 		if r.exit == 0 {
-			r.stmts(ctx, x.Then)
+			r.stmts(ctx, cm.Then)
 			break
 		}
 		r.exit = 0
-		if x.Else != nil {
-			r.cmd(ctx, x.Else)
+		if cm.Else != nil {
+			r.cmd(ctx, cm.Else)
 		}
 	case *syntax.WhileClause:
 		for !r.stop(ctx) {
 			oldNoErrExit := r.noErrExit
 			r.noErrExit = true
-			r.stmts(ctx, x.Cond)
+			r.stmts(ctx, cm.Cond)
 			r.noErrExit = oldNoErrExit
 
-			stop := (r.exit == 0) == x.Until
+			stop := (r.exit == 0) == cm.Until
 			r.exit = 0
-			if stop || r.loopStmtsBroken(ctx, x.Do) {
+			if stop || r.loopStmtsBroken(ctx, cm.Do) {
 				break
 			}
 		}
 	case *syntax.ForClause:
-		switch y := x.Loop.(type) {
+		switch y := cm.Loop.(type) {
 		case *syntax.WordIter:
 			name := y.Name.Value
 			items := r.Params // for i; do ...
@@ -486,6 +501,47 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 			inToken := y.InPos.IsValid()
 			if inToken {
 				items = r.fields(y.Items...) // for i in ...; do ...
+			}
+
+			if cm.Select {
+				ps3 := shellDefaultPS3
+				if e := r.envGet(shellReplyPS3Var); e != "" {
+					ps3 = e
+				}
+
+				prompt := func() []byte {
+					// display menu
+					for i, word := range items {
+						r.errf("%d) %v\n", i+1, word)
+					}
+					r.errf("%s", ps3)
+
+					line, err := r.readLine(ctx, true)
+					if err != nil {
+						r.exit = 1
+						return nil
+					}
+					return line
+				}
+
+			retry:
+				choice := prompt()
+				if len(choice) == 0 {
+					goto retry // no reply; try again
+				}
+
+				reply := string(choice)
+				r.setVarString(shellReplyVar, reply)
+
+				c, _ := strconv.Atoi(reply)
+				if c > 0 && c <= len(items) {
+					r.setVarString(name, items[c-1])
+				}
+
+				// execute commands until break or return is encountered
+				if r.loopStmtsBroken(ctx, cm.Do) {
+					break
+				}
 			}
 
 			for _, field := range items {
@@ -500,7 +556,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 					trace.string(` "$@"`)
 				}
 				trace.newLineFlush()
-				if r.loopStmtsBroken(ctx, x.Do) {
+				if r.loopStmtsBroken(ctx, cm.Do) {
 					break
 				}
 			}
@@ -509,7 +565,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 				r.arithm(y.Init)
 			}
 			for y.Cond == nil || r.arithm(y.Cond) != 0 {
-				if r.exit != 0 || r.loopStmtsBroken(ctx, x.Do) {
+				if r.exit != 0 || r.loopStmtsBroken(ctx, cm.Do) {
 					break
 				}
 				if y.Post != nil {
@@ -518,27 +574,27 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 			}
 		}
 	case *syntax.FuncDecl:
-		r.setFunc(x.Name.Value, x.Body)
+		r.setFunc(cm.Name.Value, cm.Body)
 	case *syntax.ArithmCmd:
-		r.exit = oneIf(r.arithm(x.X) == 0)
+		r.exit = oneIf(r.arithm(cm.X) == 0)
 	case *syntax.LetClause:
 		var val int
-		for _, expr := range x.Exprs {
+		for _, expr := range cm.Exprs {
 			val = r.arithm(expr)
 
 			if !tracingEnabled {
 				continue
 			}
 
-			switch v := expr.(type) {
+			switch expr := expr.(type) {
 			case *syntax.Word:
-				qs, err := syntax.Quote(r.literal(v), syntax.LangBash)
+				qs, err := syntax.Quote(r.literal(expr), syntax.LangBash)
 				if err != nil {
 					return
 				}
 				trace.stringf("let %v", qs)
 			case *syntax.BinaryArithm, *syntax.UnaryArithm:
-				trace.expr(x)
+				trace.expr(cm)
 			case *syntax.ParenArithm:
 				// TODO
 			}
@@ -548,11 +604,11 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		r.exit = oneIf(val == 0)
 	case *syntax.CaseClause:
 		trace.string("case ")
-		trace.expr(x.Word)
+		trace.expr(cm.Word)
 		trace.string(" in")
 		trace.newLineFlush()
-		str := r.literal(x.Word)
-		for _, ci := range x.Items {
+		str := r.literal(cm.Word)
+		for _, ci := range cm.Items {
 			for _, word := range ci.Patterns {
 				pattern := r.pattern(word)
 				if match(pattern, str) {
@@ -562,7 +618,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 			}
 		}
 	case *syntax.TestClause:
-		if r.bashTest(ctx, x.X, false) == "" && r.exit == 0 {
+		if r.bashTest(ctx, cm.X, false) == "" && r.exit == 0 {
 			// to preserve exit status code 2 for regex errors, etc
 			r.exit = 1
 		}
@@ -570,7 +626,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		local, global := false, false
 		var modes []string
 		valType := ""
-		switch x.Variant.Value {
+		switch cm.Variant.Value {
 		case "declare":
 			// When used in a function, "declare" acts as "local"
 			// unless the "-g" option is used.
@@ -589,7 +645,7 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		case "nameref":
 			valType = "-n"
 		}
-		for _, as := range x.Args {
+		for _, as := range cm.Args {
 			for _, as := range r.flattenAssign(as) {
 				name := as.Name.Value
 				if strings.HasPrefix(name, "-") {
@@ -640,22 +696,22 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		}
 	case *syntax.TimeClause:
 		start := time.Now()
-		if x.Stmt != nil {
-			r.stmt(ctx, x.Stmt)
+		if cm.Stmt != nil {
+			r.stmt(ctx, cm.Stmt)
 		}
 		format := "%s\t%s\n"
-		if x.PosixFormat {
+		if cm.PosixFormat {
 			format = "%s %s\n"
 		} else {
 			r.outf("\n")
 		}
 		real := time.Since(start)
-		r.outf(format, "real", elapsedString(real, x.PosixFormat))
+		r.outf(format, "real", elapsedString(real, cm.PosixFormat))
 		// TODO: can we do these?
-		r.outf(format, "user", elapsedString(0, x.PosixFormat))
-		r.outf(format, "sys", elapsedString(0, x.PosixFormat))
+		r.outf(format, "user", elapsedString(0, cm.PosixFormat))
+		r.outf(format, "sys", elapsedString(0, cm.PosixFormat))
 	default:
-		panic(fmt.Sprintf("unhandled command node: %T", x))
+		panic(fmt.Sprintf("unhandled command node: %T", cm))
 	}
 }
 
@@ -741,10 +797,22 @@ func (r *Runner) stmts(ctx context.Context, stmts []*syntax.Stmt) {
 	}
 }
 
-func (r *Runner) hdocReader(rd *syntax.Redirect) io.Reader {
+func (r *Runner) hdocReader(rd *syntax.Redirect) (*os.File, error) {
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	// We write to the pipe in a new goroutine,
+	// as pipe writes may block once the buffer gets full.
+	// We still construct and buffer the entire heredoc first,
+	// as doing it concurrently would lead to different semantics and be racy.
 	if rd.Op != syntax.DashHdoc {
 		hdoc := r.document(rd.Hdoc)
-		return strings.NewReader(hdoc)
+		go func() {
+			pw.WriteString(hdoc)
+			pw.Close()
+		}()
+		return pr, nil
 	}
 	var buf bytes.Buffer
 	var cur []syntax.WordPart
@@ -771,13 +839,21 @@ func (r *Runner) hdocReader(rd *syntax.Redirect) io.Reader {
 		}
 	}
 	flushLine()
-	return &buf
+	go func() {
+		pw.Write(buf.Bytes())
+		pw.Close()
+	}()
+	return pr, nil
 }
 
 func (r *Runner) redir(ctx context.Context, rd *syntax.Redirect) (io.Closer, error) {
 	if rd.Hdoc != nil {
-		r.stdin = r.hdocReader(rd)
-		return nil, nil
+		pr, err := r.hdocReader(rd)
+		if err != nil {
+			return nil, err
+		}
+		r.stdin = pr
+		return pr, nil
 	}
 	orig := &r.stdout
 	if rd.N != nil {
@@ -790,8 +866,19 @@ func (r *Runner) redir(ctx context.Context, rd *syntax.Redirect) (io.Closer, err
 	arg := r.literal(rd.Word)
 	switch rd.Op {
 	case syntax.WordHdoc:
-		r.stdin = strings.NewReader(arg + "\n")
-		return nil, nil
+		pr, pw, err := os.Pipe()
+		if err != nil {
+			return nil, err
+		}
+		r.stdin = pr
+		// We write to the pipe in a new goroutine,
+		// as pipe writes may block once the buffer gets full.
+		go func() {
+			pw.WriteString(arg)
+			pw.WriteString("\n")
+			pw.Close()
+		}()
+		return pr, nil
 	case syntax.DplOut:
 		switch arg {
 		case "1":
@@ -820,7 +907,11 @@ func (r *Runner) redir(ctx context.Context, rd *syntax.Redirect) (io.Closer, err
 	}
 	switch rd.Op {
 	case syntax.RdrIn:
-		r.stdin = f
+		stdin, err := stdinFile(f)
+		if err != nil {
+			return nil, err
+		}
+		r.stdin = stdin
 	case syntax.RdrOut, syntax.AppOut:
 		*orig = f
 	case syntax.RdrAll, syntax.AppAll:
@@ -918,6 +1009,7 @@ func (r *Runner) open(ctx context.Context, path string, flags int, mode os.FileM
 	// TODO: support wrapped PathError returned from openHandler.
 	switch err.(type) {
 	case nil:
+		return f, nil
 	case *os.PathError:
 		if print {
 			r.errf("%v\n", err)
@@ -925,15 +1017,15 @@ func (r *Runner) open(ctx context.Context, path string, flags int, mode os.FileM
 	default: // handler's custom fatal error
 		r.setErr(err)
 	}
-	return f, err
+	return nil, err
 }
 
-func (r *Runner) stat(ctx context.Context, name string) (os.FileInfo, error) {
+func (r *Runner) stat(ctx context.Context, name string) (fs.FileInfo, error) {
 	path := absPath(r.Dir, name)
 	return r.statHandler(ctx, path, true)
 }
 
-func (r *Runner) lstat(ctx context.Context, name string) (os.FileInfo, error) {
+func (r *Runner) lstat(ctx context.Context, name string) (fs.FileInfo, error) {
 	path := absPath(r.Dir, name)
 	return r.statHandler(ctx, path, false)
 }

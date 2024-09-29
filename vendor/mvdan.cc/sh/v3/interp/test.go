@@ -169,7 +169,7 @@ func (r *Runner) unTest(ctx context.Context, op syntax.UnTestOperator, x string)
 		return err == nil && info.Size() > 0
 	case syntax.TsFdTerm:
 		fd := atoi(x)
-		var f interface{}
+		var f any
 		switch fd {
 		case 0:
 			f = r.stdin
@@ -200,6 +200,8 @@ func (r *Runner) unTest(ctx context.Context, op syntax.UnTestOperator, x string)
 		return r.lookupVar(x).Kind == expand.NameRef
 	case syntax.TsNot:
 		return x == ""
+	case syntax.TsUsrOwn, syntax.TsGrpOwn:
+		return r.unTestOwnOrGrp(ctx, op, x)
 	default:
 		panic(fmt.Sprintf("unhandled unary test op: %v", op))
 	}
