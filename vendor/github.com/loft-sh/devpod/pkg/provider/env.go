@@ -8,12 +8,17 @@ import (
 	"strings"
 
 	"github.com/loft-sh/devpod/pkg/config"
+	log2 "github.com/loft-sh/log"
 )
 
 const (
-	DEVPOD             = "DEVPOD"
-	DEVPOD_OS          = "DEVPOD_OS"
-	DEVPOD_ARCH        = "DEVPOD_ARCH"
+	// general
+	DEVPOD           = "DEVPOD"
+	DEVPOD_OS        = "DEVPOD_OS"
+	DEVPOD_ARCH      = "DEVPOD_ARCH"
+	DEVPOD_LOG_LEVEL = "DEVPOD_LOG_LEVEL"
+
+	// workspace
 	WORKSPACE_ID       = "WORKSPACE_ID"
 	WORKSPACE_UID      = "WORKSPACE_UID"
 	WORKSPACE_PICTURE  = "WORKSPACE_PICTURE"
@@ -22,13 +27,21 @@ const (
 	WORKSPACE_ORIGIN   = "WORKSPACE_ORIGIN"
 	WORKSPACE_SOURCE   = "WORKSPACE_SOURCE"
 	WORKSPACE_PROVIDER = "WORKSPACE_PROVIDER"
-	MACHINE_ID         = "MACHINE_ID"
-	MACHINE_CONTEXT    = "MACHINE_CONTEXT"
-	MACHINE_FOLDER     = "MACHINE_FOLDER"
-	MACHINE_PROVIDER   = "MACHINE_PROVIDER"
-	PROVIDER_ID        = "PROVIDER_ID"
-	PROVIDER_CONTEXT   = "PROVIDER_CONTEXT"
-	PROVIDER_FOLDER    = "PROVIDER_FOLDER"
+
+	// machine
+	MACHINE_ID       = "MACHINE_ID"
+	MACHINE_CONTEXT  = "MACHINE_CONTEXT"
+	MACHINE_FOLDER   = "MACHINE_FOLDER"
+	MACHINE_PROVIDER = "MACHINE_PROVIDER"
+
+	// provider
+	PROVIDER_ID      = "PROVIDER_ID"
+	PROVIDER_CONTEXT = "PROVIDER_CONTEXT"
+	PROVIDER_FOLDER  = "PROVIDER_FOLDER"
+
+	// pro
+	LOFT_PROJECT         = "LOFT_PROJECT"
+	LOFT_FILTER_BY_OWNER = "LOFT_FILTER_BY_OWNER"
 )
 
 const (
@@ -105,6 +118,9 @@ func ToOptionsWorkspace(workspace *Workspace) map[string]string {
 			machineDir, _ := GetMachineDir(workspace.Context, workspace.Machine.ID)
 			retVars[MACHINE_FOLDER] = filepath.ToSlash(machineDir)
 		}
+		if workspace.Pro != nil && workspace.Pro.Project != "" {
+			retVars[LOFT_PROJECT] = workspace.Pro.Project
+		}
 		for k, v := range GetBaseEnvironment(workspace.Context, workspace.Provider.Name) {
 			retVars[k] = v
 		}
@@ -169,6 +185,7 @@ func GetBaseEnvironment(context, provider string) map[string]string {
 	retVars[PROVIDER_CONTEXT] = context
 	providerFolder, _ := GetProviderDir(context, provider)
 	retVars[PROVIDER_FOLDER] = filepath.ToSlash(providerFolder)
+	retVars[DEVPOD_LOG_LEVEL] = log2.Default.GetLevel().String()
 	return retVars
 }
 
