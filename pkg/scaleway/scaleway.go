@@ -13,7 +13,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/ssh"
 	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
-	"github.com/scaleway/scaleway-sdk-go/api/account/v2"
+	"github.com/scaleway/scaleway-sdk-go/api/account/v3"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )
@@ -21,7 +21,7 @@ import (
 type ScalewayProvider struct {
 	Config           *options.Options
 	InstanceAPI      *instance.API
-	AccountAPI       *account.API
+	AccountAPI       *account.ProjectAPI
 	Log              log.Logger
 	WorkingDirectory string
 }
@@ -60,7 +60,7 @@ func NewProvider(logs log.Logger, init bool) (*ScalewayProvider, error) {
 		Config:      config,
 		Log:         logs,
 		InstanceAPI: instance.NewAPI(client),
-		AccountAPI:  account.NewAPI(client),
+		AccountAPI:  account.NewProjectAPI(client),
 	}
 	return provider, nil
 }
@@ -96,7 +96,7 @@ func Create(scalewayProvider *ScalewayProvider) error {
 
 	server, err := scalewayProvider.InstanceAPI.CreateServer(&instance.CreateServerRequest{
 		CommercialType: scalewayProvider.Config.CommercialType,
-		Image:          scalewayProvider.Config.Image,
+		Image:          &scalewayProvider.Config.Image,
 		Tags:           []string{scalewayProvider.Config.MachineID},
 		Volumes: map[string]*instance.VolumeServerTemplate{
 			"0": {
