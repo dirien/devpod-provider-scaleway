@@ -10,7 +10,7 @@ permissions:
 jobs:
   publish-cli:
     if: startsWith(github.ref, 'refs/tags/v') == true
-    runs-on: macos-12
+    runs-on: macos-latest
     steps:
       - name: Set up Go 1.22
         uses: actions/setup-go@v5
