@@ -1,7 +1,6 @@
 module github.com/dirien/devpod-provider-scaleway
 
 go 1.22.6
-
 toolchain go1.23.6
 
 require (
@@ -10,7 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.32
 	github.com/spf13/cobra v1.8.1
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.35.0
 )
 
 require (
