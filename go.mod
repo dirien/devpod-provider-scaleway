@@ -5,7 +5,7 @@ go 1.22.6
 toolchain go1.23.6
 
 require (
-	github.com/loft-sh/devpod v0.6.11
+	github.com/loft-sh/devpod v0.6.15
 	github.com/loft-sh/log v0.0.0-20240219160058-26d83ffb46ac
 	github.com/pkg/errors v0.9.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.32
