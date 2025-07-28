@@ -105,8 +105,8 @@ github.com/pkg/errors
 github.com/planetscale/vtprotobuf/protohelpers
 # github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 ## explicit
-# github.com/scaleway/scaleway-sdk-go v1.0.0-beta.32
-## explicit; go 1.17
+# github.com/scaleway/scaleway-sdk-go v1.0.0-beta.34
+## explicit; go 1.23.0
 github.com/scaleway/scaleway-sdk-go/api/account/v3
 github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1
 github.com/scaleway/scaleway-sdk-go/api/instance/v1
@@ -144,7 +144,7 @@ golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/sync v0.14.0
+# golang.org/x/sync v0.15.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.33.0
@@ -156,7 +156,7 @@ golang.org/x/sys/windows
 # golang.org/x/term v0.32.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.25.0
+# golang.org/x/text v0.26.0
 ## explicit; go 1.23.0
 golang.org/x/text/cases
 golang.org/x/text/internal
